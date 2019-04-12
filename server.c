@@ -4,8 +4,12 @@
 #include <pthread.h>
 
 void *myThread(void *vargp) {
-	sleep(1);
-	printf("thread workload\n");
+	int i = 0;
+	while(1) {
+		printf("thread workload: %d\n", i);
+		i++;
+		sleep(1);
+	}
 	return NULL;
 }
 
@@ -14,7 +18,7 @@ int main() {
 	printf("Before Thread\n");
 	pthread_create(&thread_id, NULL, myThread, NULL);
 	pthread_join(thread_id, NULL);
-	printf("After Thread\n");
+	printf("After thread\n");
 	exit(0);
 
 	return 0;
