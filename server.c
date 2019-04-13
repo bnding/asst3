@@ -38,7 +38,7 @@ void createServer(int port, int sockfd) {
 		fprintf(stderr, "Error. Socket creation failed.\n");
 		exit(0);
 	} else {
-		printf("Socket succesfully created!\n");
+		printf("Socket successfully created!\n");
 	}
 
 	bzero(&serverAddr, sizeof(serverAddr));
@@ -56,7 +56,7 @@ void createServer(int port, int sockfd) {
 		fprintf(stderr, "Error. socket bind failed.\n");
 		exit(0);
 	} else {
-		printf("Socket succesffully binded!\n");
+		printf("Socket successfully binded!\n");
 	}
 
 	if ((listen(sockfd, 5)) != 0) {
