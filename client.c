@@ -5,6 +5,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <dirent.h>
+#include <fcntl.h>
 
 char* getCommands(char* cmd) {
 	if(strcmp("configure", cmd) == 0) {
@@ -15,7 +17,7 @@ char* getCommands(char* cmd) {
 	}
 }
 
-void configure(int argc, char* ip, int port) {
+void connectServer(int argc, char* ip, int port) {
 	printf("IP: %s\n", ip);
 	printf("port: %d\n", port);
 
@@ -48,7 +50,24 @@ void configure(int argc, char* ip, int port) {
 	}
 }
 
+void configure(int argc, char* ip, char* port) {
+	int fd;
+	char c;
+	int bytesread;
+	int count = 0;
+
+	fd = open(".configure", O_CREAT | O_RDWR, 0644);
+	write(fd, ip, strlen(ip));
+	write(fd, " ", 1);
+	write(fd, port, strlen(port));
+
+
+}
+
 int main(int argc, char** argv) {
+	//note : use strtol(argv[3], NULL, 10) to convert port number from string to int
+
+
 	char* cmd;
 	if(argc < 3) {
 		fprintf(stderr, "Error. Invalid number of inputs.\n");
@@ -63,7 +82,8 @@ int main(int argc, char** argv) {
 			fprintf(stderr, "Error. Invalid number of inputs for configure.\n");
 			return 0;
 		}
-		configure(argc, argv[2], strtol(argv[3], NULL, 10));
+		configure(argc, argv[2], argv[3]);
+		printf("Configured!\nIP: %s\nPort: %s\n", argv[2], argv[3]);
 	}
 
 
