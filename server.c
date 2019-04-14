@@ -26,7 +26,7 @@ void signalHandler() {
 }
 
 void handlerExit() {
-	printf("Terminating...\n");
+	printf("\nTerminating...\n");
 }
 
 void createServer(int port, int sockfd) {
@@ -100,10 +100,6 @@ int main(int argc, char** argv) {
 	int sockfd;
 
 	createServer(port, sockfd);
-
-
-
-
 
 
 	pthread_t thread_id;
