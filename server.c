@@ -43,7 +43,7 @@ void createServer(int port, int sockfd) {
 
 	bzero(&serverAddr, sizeof(serverAddr));
 
-	if(port < 8000 || port >= 64000) {
+	if(port < 8000 || port > 64000) {
 		fprintf(stderr, "Error. Server port is not within range!\n");
 		exit(0);
 	}

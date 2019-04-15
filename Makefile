@@ -7,4 +7,4 @@ WTFserver: server.c
 	gcc -O -g server.c -o WTFserver -lpthread
 
 clean:
-	rm-rf WTF WTFserver
+	rm-rf WTF WTFserver 
