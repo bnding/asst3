@@ -8,12 +8,17 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-void connectServer(char* cmd, char* ip, int port) {
+#define BUFSIZE 1024
+
+
+
+//connects client and server
+int connectServer(char* cmd, char* ip, int port) {
 	printf("IP: %s\n", ip);
 	printf("port: %d\n", port);
 
-	int sock = 0; 
-	struct sockaddr_in serverAddr; 
+	int sock = 0;
+	struct sockaddr_in serverAddr;
 
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -30,12 +35,15 @@ void connectServer(char* cmd, char* ip, int port) {
 	serverAddr.sin_port = htons(port);
 
 
+
 	if(connect(sock, (struct sockaddr*) &serverAddr, sizeof(serverAddr)) < 0) {
 		fprintf(stderr, "Error. Connection to server failed.\n");
 		exit(0);
 	} else {
 		printf("Successfully connected to server!\n");
 	}
+
+	return sock;
 }
 
 void configure(char* ip, char* port) {
@@ -59,7 +67,7 @@ char** readConfig() {
 	if(fd == -1) {
 		fprintf(stderr, "Cannot communicate with server. IP and Port is not configured.\nTerminating.\n");
 		exit(0);
-	} 
+	}
 
 	//get number of characters in text file
 	int count = 0;
@@ -97,9 +105,23 @@ char** readConfig() {
 }
 
 
-void create() {
+void create(char* projectName) {
+	char buf[BUFSIZE]; /* message buffer */
+	int n;
+
 	char** config = readConfig();
-	connectServer("create", config[0], strtol(config[1], NULL, 10));
+	int sockfd = connectServer("create", config[0], strtol(config[1], NULL, 10));
+
+
+	//send the message line to the server
+	n = write(sockfd, projectName, strlen(projectName));
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket");
+	}
+
+	struct dirent *de;  // Pointer for directory entry
+
+	close(sockfd);
 }
 
 
@@ -109,8 +131,8 @@ int main(int argc, char** argv) {
 	if(argc < 3) {
 		fprintf(stderr, "Error. Invalid number of inputs.\n");
 		return 0;
-	} 
-	
+	}
+
 	if(strcmp("configure", argv[1]) == 0) {
 		if(argc < 4) {
 			fprintf(stderr, "Error. Invalid number of inputs for configure.\n");
@@ -118,6 +140,7 @@ int main(int argc, char** argv) {
 		}
 		configure(argv[2], argv[3]);
 		printf("Configured!\nIP: %s\nPort: %s\n", argv[2], argv[3]);
+
 	} else if (strcmp("checkout", argv[1]) == 0) {
 		if(access(".configure", F_OK) != -1) {
 			printf("file exists\n");
@@ -127,7 +150,7 @@ int main(int argc, char** argv) {
 		}
 	} else if (strcmp("create", argv[1]) == 0) {
 		printf("create\n");
-		create();
+		create(argv[2]);
 
 	}
 
