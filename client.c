@@ -106,7 +106,6 @@ char** readConfig() {
 
 
 void create(char* projectName) {
-	char buf[BUFSIZE]; /* message buffer */
 	int n;
 
 	char** config = readConfig();
@@ -117,9 +116,8 @@ void create(char* projectName) {
 	n = write(sockfd, projectName, strlen(projectName));
 	if (n < 0){
 		fprintf(stderr, "Error. Cannot write to socket");
+		exit(0);
 	}
-
-	struct dirent *de;  // Pointer for directory entry
 
 	close(sockfd);
 }

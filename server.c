@@ -82,48 +82,57 @@ int createServer(int port, int sockfd) {
 
 }
 
+//takes in the name of the file its lookingFor and the folderName
+//returns 1 if folder exists
+int folderExist(char* lookingFor, char* folderName){
+	DIR *dr = opendir(folderName);
+
+    	if (dr == NULL){
+        	fprintf(stderr, "Error. Cannot open current directory" );
+		exit(0);
+    	}
+
+	struct dirent *dd;
+	while ((dd = readdir(dr)) != NULL){
+		if((dd->d_type == DT_DIR) && (strcmp(dd->d_name, lookingFor) == 0)){
+			printf("found %s\n", dd->d_name);
+			return 1;
+		}
+	}
+	return 0;
+
+	closedir(dr);
+
+}
+
 void serverTalk(int sockfd, int childfd){
 
 	char* projectName[BUFSIZE];
 	int n;
-	struct dirent *dd;
 
 	//read input string from the client
 	bzero(projectName, BUFSIZE);
 	n = read(childfd, projectName, BUFSIZE);
 	if (n < 0){
 		fprintf(stderr, "Error, Cannot read from socket");
+		exit(0);
 	}
 
 	printf("Server received: %s \n", projectName);
 
 	//opens directory and checks if server repo exists
-    	DIR *dr = opendir(".");
-
-    	if (dr == NULL){
-        	fprintf(stderr, "Error. Cannot open current directory" );
-		return;
-    	}
 
 	//change asst2 to be repository folder name
 	//i just made it asst2 so that i could test that i would stop
-	int i = 0;
-    	while ((dd = readdir(dr)) != NULL){
-		if((dd->d_type == DT_DIR) && (strcmp(dd->d_name, "asst2") == 0)){
-			printf("found %s\n", dd->d_name);
-			i = 1;
-			break;
-		}
-	}
+	int i = folderExist("asst2", ".");
 
 	//makes the repository if it dne
 	if(i == 0){
 		//make the repository
 	}
 
+	//i = folderExist(projectName, "serverRepo"); //this one should check if the folder exists in repo
 	//add the projectName to repository
-
-    	closedir(dr);
 
 }
 
