@@ -8,8 +8,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
-#define BUFSIZE 1024
+#define BUFF 1024
 
 
 static int keepRunning = 1;
@@ -82,57 +83,44 @@ int createServer(int port, int sockfd) {
 
 }
 
-//takes in the name of the file its lookingFor and the folderName
+//takes in the name of the folder its looking for
 //returns 1 if folder exists
-int folderExist(char* lookingFor, char* folderName){
-	DIR *dr = opendir(folderName);
+int folderExist(char* lookingFor){
+	struct stat buffer;
+	stat(lookingFor, &buffer);
 
-    	if (dr == NULL){
-        	fprintf(stderr, "Error. Cannot open current directory" );
-		exit(0);
+    	if (S_ISDIR(buffer.st_mode)){
+	    	return 1;
     	}
-
-	struct dirent *dd;
-	while ((dd = readdir(dr)) != NULL){
-		if((dd->d_type == DT_DIR) && (strcmp(dd->d_name, lookingFor) == 0)){
-			printf("found %s\n", dd->d_name);
-			return 1;
-		}
-	}
 	return 0;
 
-	closedir(dr);
 
 }
 
-void serverTalk(int sockfd, int childfd){
+void serverTalk(int childfd){
 
-	char* projectName[BUFSIZE];
+	char projectName[BUFF];
 	int n;
 
 	//read input string from the client
-	bzero(projectName, BUFSIZE);
-	n = read(childfd, projectName, BUFSIZE);
+	bzero(projectName, BUFF);
+	n = read(childfd, projectName, BUFF);
 	if (n < 0){
 		fprintf(stderr, "Error, Cannot read from socket");
 		exit(0);
 	}
 
-	printf("Server received: %s \n", projectName);
-
-	//opens directory and checks if server repo exists
-
-	//change asst2 to be repository folder name
-	//i just made it asst2 so that i could test that i would stop
-	int i = folderExist("asst2", ".");
-
-	//makes the repository if it dne
-	if(i == 0){
-		//make the repository
+	if(folderExist("serverRepo") == 0){
+		mkdir("serverRepo", 0700);
 	}
 
-	//i = folderExist(projectName, "serverRepo"); //this one should check if the folder exists in repo
-	//add the projectName to repository
+	char filePath[BUFF];
+	sprintf(filePath, "serverRepo/%s", projectName);
+
+	if(folderExist(filePath) == 0){
+		mkdir(filePath, 0700);
+	}
+
 
 }
 
@@ -160,9 +148,7 @@ int main(int argc, char** argv) {
 
 	int childfd = createServer(port, sockfd);
 
-	//printf("here\n");
-
-	serverTalk(sockfd, childfd);
+	serverTalk(childfd);
 
 
 

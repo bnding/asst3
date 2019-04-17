@@ -8,8 +8,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#define BUFSIZE 1024
-
 
 
 //connects client and server
