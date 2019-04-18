@@ -103,7 +103,7 @@ void serverTalk(int childfd){
 	int n;
 
 	//read input string from the client
-	bzero(projectName, BUFF);
+	//bzero(projectName, BUFF);
 	n = read(childfd, projectName, BUFF);
 	if (n < 0){
 		fprintf(stderr, "Error, Cannot read from socket");
@@ -114,8 +114,12 @@ void serverTalk(int childfd){
 		mkdir("serverRepo", 0700);
 	}
 
-	char filePath[BUFF];
-	sprintf(filePath, "serverRepo/%s", projectName);
+	char* filePath = (char*) malloc((strlen("serverRepo/") + strlen(projectName)) * sizeof(char));
+	memcpy(filePath, "serverRepo/", strlen("serverRepo/%s"));
+	memcpy(filePath, "serverRepo/", strlen("serverRepo/"));
+	filePath[strlen("serverRepo/")] = '\0';
+	strcat(filePath, projectName);
+	printf("%s\n\n", filePath);
 
 	if(folderExist(filePath) == 0){
 		mkdir(filePath, 0700);

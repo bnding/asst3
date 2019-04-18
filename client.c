@@ -115,6 +115,8 @@ void create(char* projectName) {
 	if (n < 0){
 		fprintf(stderr, "Error. Cannot write to socket");
 		exit(0);
+	} else {
+		printf("New project made in server.\n");
 	}
 
 	close(sockfd);
