@@ -90,39 +90,50 @@ int folderExist(char* lookingFor){
 	stat(lookingFor, &buffer);
 
     	if (S_ISDIR(buffer.st_mode)){
+		printf("Is a dir %s\n", lookingFor);
 	    	return 1;
     	}
-	return 0;
+	printf("Is not a dir %s\n", lookingFor);
 
+	return 0;
 
 }
 
-void serverTalk(int childfd){
+void serverCreate(int childfd){
 
 	char projectName[BUFF];
 	int n;
 
 	//read input string from the client
-	//bzero(projectName, BUFF);
+	bzero(projectName, BUFF);
 	n = read(childfd, projectName, BUFF);
 	if (n < 0){
 		fprintf(stderr, "Error, Cannot read from socket");
 		exit(0);
 	}
 
+	//creates serverRepo if dne
 	if(folderExist("serverRepo") == 0){
 		mkdir("serverRepo", 0700);
 	}
 
-	char* filePath = (char*) malloc((strlen("serverRepo/") + strlen(projectName)) * sizeof(char));
-	memcpy(filePath, "serverRepo/", strlen("serverRepo/%s"));
-	memcpy(filePath, "serverRepo/", strlen("serverRepo/"));
-	filePath[strlen("serverRepo/")] = '\0';
-	strcat(filePath, projectName);
-	printf("%s\n\n", filePath);
+	//makes the file in serverRepo
+	char filePath[BUFF];
+
+
+	// memcpy(filepath, "serverRepo/", strlen( "serverRepo/%s"));
+ 	// memcpy(filePath, "serverRepo/", strlen("serverRepo/"));
+	// filePath[strlen("serverRepo/")] = '\0';
+	// strcat(filePath, projectName);
+
+	sprintf(filePath, "serverRepo/%s", projectName);
+	// filePath[strlen( "serverRepo/") + strlen(projectName)] = '\0';
+	printf("%s\n", filePath);
 
 	if(folderExist(filePath) == 0){
 		mkdir(filePath, 0700);
+	} else {
+		fprintf(stderr, "Error, project with that name already exits\n");
 	}
 
 
@@ -152,7 +163,7 @@ int main(int argc, char** argv) {
 
 	int childfd = createServer(port, sockfd);
 
-	serverTalk(childfd);
+	serverCreate(childfd);
 
 
 
