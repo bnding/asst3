@@ -93,11 +93,7 @@ int folderExist(char* lookingFor){
 		printf("Is a dir %s\n", lookingFor);
 	    	return 1;
     	}
-<<<<<<< HEAD
-	return 0; 
-=======
 	printf("Is not a dir %s\n", lookingFor);
->>>>>>> db91680f7fd025163c39b4f795adfe2a67fb64e5
 
 	return 0;
 
