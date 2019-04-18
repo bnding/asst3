@@ -92,7 +92,7 @@ int folderExist(char* lookingFor){
     	if (S_ISDIR(buffer.st_mode)){
 	    	return 1;
     	}
-	return 0; 
+	return 0;
 
 
 }
