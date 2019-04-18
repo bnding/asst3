@@ -7,11 +7,12 @@
 #include <netdb.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
-
+#define BUFF 1024
 
 //connects client and server
-int connectServer(char* cmd, char* ip, int port) {
+int connectServer(char* ip, int port) {
 	printf("IP: %s\n", ip);
 	printf("port: %d\n", port);
 
@@ -46,7 +47,7 @@ int connectServer(char* cmd, char* ip, int port) {
 
 void configure(char* ip, char* port) {
 	int intPort = strtol(port, NULL, 10);
-	if(intPort < 8000 || intPort > 64000) {
+	if(intPort < 8000 || intPort > 65535) {
 		fprintf(stderr, "Invalid port. Need to be >8k and <64k.\nTerminating.\n");
 		exit(0);
 	}
@@ -102,18 +103,56 @@ char** readConfig() {
 
 }
 
+int folderExists(char* lookingFor) {
+	struct stat buffer;
+	stat(lookingFor, &buffer);
+	if(S_ISDIR(buffer.st_mode)) {
+		return 1;
+	}
+	return 0;
+}
+
 
 void create(char* projectName) {
-	int n;
-
 	char** config = readConfig();
-	int sockfd = connectServer("create", config[0], strtol(config[1], NULL, 10));
+	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
 
 	//send the message line to the server
+	int n = write(sockfd, "create ", strlen("create "));
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+
 	n = write(sockfd, projectName, strlen(projectName));
 	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket");
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+
+	char status[BUFF];
+	bzero(status, BUFF);
+	read(sockfd, status, BUFF);
+
+	printf("status: %s\n\n", status);
+
+	if(strcmp(status, "success") == 0) {
+		printf("Project directory succesfully made on server! Creating directories locally...\n");
+		if(folderExists("ClientRepo") == 0) {
+			mkdir("ClientRepo", 0700);
+		}
+		char filePath[BUFF];
+		sprintf(filePath, "ClientRepo/%s", projectName);
+		mkdir(filePath, 0700);
+
+		sprintf(filePath, "%s/.Manifest", filePath);
+
+		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
+		close(fd);
+
+	} else {
+		fprintf(stderr, "Error. Project with name already exists!\n");
 		exit(0);
 	}
 

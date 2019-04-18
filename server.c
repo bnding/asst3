@@ -9,15 +9,16 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #define BUFF 1024
 
 
-static int keepRunning = 1;
+int run = 1;
 
 void *myThread(void *vargp) {
 	int i = 0;
-	while(keepRunning) {
+	while(1) {
 		printf("thread workload: %d\n", i);
 		i++;
 		sleep(1);
@@ -26,18 +27,18 @@ void *myThread(void *vargp) {
 }
 
 void signalHandler() {
-	keepRunning = 0;
+	run = 0;
 }
 
 void handlerExit() {
 	printf("\nTerminating...\n");
 }
 
-int createServer(int port, int sockfd) {
+int createServer(int port) {
 	int connfd, len;
 	struct sockaddr_in serverAddr, client;
 
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sockfd < 0) {
 		fprintf(stderr, "Error. Socket creation failed.\n");
 		exit(0);
@@ -90,54 +91,69 @@ int folderExist(char* lookingFor){
 	stat(lookingFor, &buffer);
 
     	if (S_ISDIR(buffer.st_mode)){
-		printf("Is a dir %s\n", lookingFor);
 	    	return 1;
     	}
-	printf("Is not a dir %s\n", lookingFor);
-
 	return 0;
 
 }
 
-void serverCreate(int childfd){
 
-	char projectName[BUFF];
-	int n;
-
-	//read input string from the client
-	bzero(projectName, BUFF);
-	n = read(childfd, projectName, BUFF);
-	if (n < 0){
-		fprintf(stderr, "Error, Cannot read from socket");
-		exit(0);
+void create(char* projectName, int childfd){
+	//creates ServerRepo if dne
+	if(folderExist("ServerRepo") == 0){
+		mkdir("ServerRepo", 0700);
 	}
 
-	//creates serverRepo if dne
-	if(folderExist("serverRepo") == 0){
-		mkdir("serverRepo", 0700);
-	}
-
-	//makes the file in serverRepo
+	//makes the file in ServerRepo 
 	char filePath[BUFF];
 
-
-	// memcpy(filepath, "serverRepo/", strlen( "serverRepo/%s"));
- 	// memcpy(filePath, "serverRepo/", strlen("serverRepo/"));
-	// filePath[strlen("serverRepo/")] = '\0';
-	// strcat(filePath, projectName);
-
-	sprintf(filePath, "serverRepo/%s", projectName);
-	// filePath[strlen( "serverRepo/") + strlen(projectName)] = '\0';
-	printf("%s\n", filePath);
+	sprintf(filePath, "ServerRepo/%s", projectName);
+	printf("attempting to create project in path: %s\n", filePath);
 
 	if(folderExist(filePath) == 0){
 		mkdir(filePath, 0700);
+
+		sprintf(filePath, "%s/.Manifest", filePath);
+		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
+		close(fd);
+
+		int n = write(childfd, "success", strlen("success"));
+		if(n < 0) {
+			fprintf(stderr, "Error. Cannot write to socket\n");
+			exit(0);
+		}
+
 	} else {
-		fprintf(stderr, "Error, project with that name already exits\n");
+		exit(0);
+	}
+
+
+
+}
+
+
+void getCommand(int childfd) {
+	char command[BUFF];
+	bzero(command, BUFF);
+
+	int n = read(childfd, command, strlen("create"));
+	
+	if(n < 0) {
+		//fprintf(stderr, "Error, Cannot read from socket");
+		exit(0);
+	} else {
+		if(strcmp("create", command) == 0) {
+			char projectName[BUFF];
+			n = read(childfd, command, BUFF);
+			memmove(command, command+1, strlen(command));
+			create(command, childfd);
+		}
 	}
 
 
 }
+
+
 
 
 int main(int argc, char** argv) {
@@ -159,11 +175,11 @@ int main(int argc, char** argv) {
 	}
 
 	int port = strtol(argv[1], NULL, 10);
-	int sockfd;
+	//int sockfd;
 
-	int childfd = createServer(port, sockfd);
+	int childfd = createServer(port);
 
-	serverCreate(childfd);
+	getCommand(childfd);
 
 
 
@@ -173,7 +189,7 @@ int main(int argc, char** argv) {
 	// pthread_join(thread_id, NULL);
 
 
-	close(sockfd);
+	//close(sockfd);
 	close(childfd);
 	exit(0);
 
