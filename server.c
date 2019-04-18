@@ -90,14 +90,20 @@ int folderExist(char* lookingFor){
 	stat(lookingFor, &buffer);
 
     	if (S_ISDIR(buffer.st_mode)){
+		printf("Is a dir %s\n", lookingFor);
 	    	return 1;
     	}
+<<<<<<< HEAD
 	return 0; 
+=======
+	printf("Is not a dir %s\n", lookingFor);
+>>>>>>> db91680f7fd025163c39b4f795adfe2a67fb64e5
 
+	return 0;
 
 }
 
-void serverTalk(int childfd){
+void serverCreate(int childfd){
 
 	char projectName[BUFF];
 	int n;
@@ -110,15 +116,28 @@ void serverTalk(int childfd){
 		exit(0);
 	}
 
+	//creates serverRepo if dne
 	if(folderExist("serverRepo") == 0){
 		mkdir("serverRepo", 0700);
 	}
 
+	//makes the file in serverRepo
 	char filePath[BUFF];
+
+
+	// memcpy(filepath, "serverRepo/", strlen( "serverRepo/%s"));
+ 	// memcpy(filePath, "serverRepo/", strlen("serverRepo/"));
+	// filePath[strlen("serverRepo/")] = '\0';
+	// strcat(filePath, projectName);
+
 	sprintf(filePath, "serverRepo/%s", projectName);
+	// filePath[strlen( "serverRepo/") + strlen(projectName)] = '\0';
+	printf("%s\n", filePath);
 
 	if(folderExist(filePath) == 0){
 		mkdir(filePath, 0700);
+	} else {
+		fprintf(stderr, "Error, project with that name already exits\n");
 	}
 
 
@@ -148,7 +167,7 @@ int main(int argc, char** argv) {
 
 	int childfd = createServer(port, sockfd);
 
-	serverTalk(childfd);
+	serverCreate(childfd);
 
 
 
