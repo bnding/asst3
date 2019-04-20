@@ -99,15 +99,17 @@ int folderExist(char* lookingFor){
 
 
 void create(char* projectName, int childfd){
+	printf("project name: %s\n", projectName);
+	printf("length: %d\n", strlen(projectName));
 	//creates ServerRepo if dne
-	if(folderExist("ServerRepo") == 0){
-		mkdir("ServerRepo", 0700);
+	if(folderExist(".server_repo") == 0){
+		mkdir(".server_repo", 0700);
 	}
 
 	//makes the file in ServerRepo 
 	char filePath[BUFF];
 
-	sprintf(filePath, "ServerRepo/%s", projectName);
+	sprintf(filePath, ".server_repo/%s", projectName);
 	printf("attempting to create project in path: %s\n", filePath);
 
 	if(folderExist(filePath) == 0){
@@ -144,9 +146,9 @@ void getCommand(int childfd) {
 	} else {
 		if(strcmp("create", command) == 0) {
 			char projectName[BUFF];
-			n = read(childfd, command, BUFF);
-			memmove(command, command+1, strlen(command));
-			create(command, childfd);
+			n = read(childfd, projectName, BUFF);	
+			memmove(projectName, projectName+1, strlen(projectName));
+			create(projectName, childfd);
 		}
 	}
 

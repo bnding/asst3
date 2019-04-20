@@ -57,6 +57,7 @@ void configure(char* ip, char* port) {
 	write(fd, ip, strlen(ip));
 	write(fd, " ", 1);
 	write(fd, port, strlen(port));
+	close(fd);
 
 
 }
@@ -139,16 +140,17 @@ void create(char* projectName) {
 
 	if(strcmp(status, "success") == 0) {
 		printf("Project directory succesfully made on server! Creating directories locally...\n");
-		if(folderExists("ClientRepo") == 0) {
-			mkdir("ClientRepo", 0700);
-		}
-		char filePath[BUFF];
-		sprintf(filePath, "ClientRepo/%s", projectName);
+		//if(folderExists("ClientRepo") == 0) {
+		//	mkdir("ClientRepo", 0700);
+		//}
+
+		char* filePath = (char*) malloc(strlen(projectName) * sizeof(char));
+		filePath = projectName;
 		mkdir(filePath, 0700);
 
 		sprintf(filePath, "%s/.Manifest", filePath);
-
 		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
+		printf("test\n");
 		close(fd);
 
 	} else {
@@ -188,8 +190,6 @@ int main(int argc, char** argv) {
 		create(argv[2]);
 
 	}
-
-
 	return 0;
 
 
