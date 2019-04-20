@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "sha256.h"
 
 #define BUFF 1024
 
@@ -82,7 +83,7 @@ char** readConfig() {
 	fd = open(".configure", O_RDONLY, 0644);
 	int i = 0;
 	while(read(fd, &c, 1)) {
-		configStr[i] += c;
+		configStr[i] = c;
 		i++;
 	}
 	close(fd);
@@ -103,16 +104,6 @@ char** readConfig() {
 
 
 }
-
-int folderExists(char* lookingFor) {
-	struct stat buffer;
-	stat(lookingFor, &buffer);
-	if(S_ISDIR(buffer.st_mode)) {
-		return 1;
-	}
-	return 0;
-}
-
 
 void create(char* projectName) {
 	char** config = readConfig();
@@ -140,14 +131,12 @@ void create(char* projectName) {
 
 	if(strcmp(status, "success") == 0) {
 		printf("Project directory succesfully made on server! Creating directories locally...\n");
-		//if(folderExists("ClientRepo") == 0) {
-		//	mkdir("ClientRepo", 0700);
-		//}
 
 		char* filePath = (char*) malloc(strlen(projectName) * sizeof(char));
 		filePath = projectName;
 		mkdir(filePath, 0700);
 
+		//TODO: Receive FTP from server here. Remove this part later...
 		sprintf(filePath, "%s/.Manifest", filePath);
 		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
 		printf("test\n");
@@ -165,6 +154,15 @@ void create(char* projectName) {
 int main(int argc, char** argv) {
 	char* ip;
 	int port;
+
+	//showing it works. we can delete later.
+	static unsigned char hashCode[65];
+	sha256File("test1.txt", hashCode);
+	printf("hash code: %s\n", hashCode);
+
+
+
+
 	if(argc < 3) {
 		fprintf(stderr, "Error. Invalid number of inputs.\n");
 		return 0; 

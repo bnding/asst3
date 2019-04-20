@@ -119,7 +119,14 @@ void create(char* projectName, int childfd){
 		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
 		close(fd);
 
+
+
 		int n = write(childfd, "success", strlen("success"));
+		//TODO: FTP here after "success"
+		
+		
+		
+		
 		if(n < 0) {
 			fprintf(stderr, "Error. Cannot write to socket\n");
 			exit(0);
