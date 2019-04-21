@@ -106,27 +106,28 @@ void create(char* projectName, int childfd){
 		mkdir(".server_repo", 0700);
 	}
 
-	//makes the file in ServerRepo 
+	//makes the file in ServerRepo
 	char filePath[BUFF];
 
 	sprintf(filePath, ".server_repo/%s", projectName);
 	printf("attempting to create project in path: %s\n", filePath);
 
+	//opendir()
+
 	if(folderExist(filePath) == 0){
 		mkdir(filePath, 0700);
+
+		//printf("here\n");
 
 		sprintf(filePath, "%s/.Manifest", filePath);
 		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
 		close(fd);
 
 
-
 		int n = write(childfd, "success", strlen("success"));
 		//TODO: FTP here after "success"
-		
-		
-		
-		
+
+
 		if(n < 0) {
 			fprintf(stderr, "Error. Cannot write to socket\n");
 			exit(0);
@@ -146,15 +147,16 @@ void getCommand(int childfd) {
 	bzero(command, BUFF);
 
 	int n = read(childfd, command, strlen("create"));
-	
+
 	if(n < 0) {
 		//fprintf(stderr, "Error, Cannot read from socket");
 		exit(0);
 	} else {
 		if(strcmp("create", command) == 0) {
 			char projectName[BUFF];
-			n = read(childfd, projectName, BUFF);	
+			n = read(childfd, projectName, BUFF);
 			memmove(projectName, projectName+1, strlen(projectName));
+			printf("%s\n", projectName);
 			create(projectName, childfd);
 		}
 	}
