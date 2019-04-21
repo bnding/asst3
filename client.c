@@ -112,6 +112,8 @@ void create(char* projectName) {
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
+	printf("%s\n", projectName);
+
 
 	//send the message line to the server
 	int n = write(sockfd, "create ", strlen("create "));
@@ -153,6 +155,44 @@ void create(char* projectName) {
 	close(sockfd);
 }
 
+void add(char* projectName, char* fileName){
+
+	struct dirent *dd;
+	DIR *de;
+
+	printf("project name: %s\n", projectName);
+	printf("file name: %s\n", fileName);
+
+	char filePath[BUFF];
+
+	//checks if the folder exists
+	if ((de = opendir(projectName)) == NULL){
+		fprintf(stderr, "Project %s does not exist\n", projectName);
+		exit(0);
+	}
+
+
+	//get hashcode
+	static unsigned char hashCode[65];
+	sha256File(fileName, hashCode);
+
+	//get the address
+	memcpy(filePath, projectName, strlen(projectName));
+	filePath[strlen(projectName)] = '\0';
+	strcat(filePath, "/");
+	strcat(filePath, ".Manifest");
+	printf("%s\n", filePath);
+
+	char* line = (char*)malloc(strlen(filePath) + strlen(hashCode) + 3);
+	sprintf(line, "1 %s %s", filePath, hashCode);
+
+	//write into the file
+	int fd = open(filePath, O_WRONLY | O_APPEND);
+	write(fd, line, strlen(line));
+	write(fd, "\n", strlen("\n"));
+
+}
+
 
 int main(int argc, char** argv) {
 	char* ip;
@@ -161,14 +201,14 @@ int main(int argc, char** argv) {
 	//showing it works. we can delete later.
 	static unsigned char hashCode[65];
 	sha256File("test1.txt", hashCode);
-	printf("hash code: %s\n", hashCode);
+	//printf("hash code: %s\n", hashCode);
 
 
 
 
 	if(argc < 3) {
 		fprintf(stderr, "Error. Invalid number of inputs.\n");
-		return 0; 
+		return 0;
 	}
 
 	if(strcmp("configure", argv[1]) == 0) {
@@ -189,6 +229,10 @@ int main(int argc, char** argv) {
 	} else if (strcmp("create", argv[1]) == 0) {
 		printf("create\n");
 		create(argv[2]);
+
+	} else if (strcmp("add", argv[1]) == 0) {
+		printf("add\n");
+		add(argv[2], argv[3]);
 
 	}
 	return 0;
