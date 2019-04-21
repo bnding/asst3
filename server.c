@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define BUFF 1024
+#define BUFF 8192
 
 
 int run = 1;
@@ -123,6 +123,7 @@ void create(char* projectName, int childfd){
 
 		int n = write(childfd, "success", strlen("success"));
 		//TODO: FTP here after "success"
+		//sendOne("blanket/test1.txt", "test1.txt", 0);
 		
 		
 		

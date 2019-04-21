@@ -9,8 +9,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "sha256.h"
+#include "ftp.h"
 
-#define BUFF 1024
+#define BUFF 8192
 
 //connects client and server
 int connectServer(char* ip, int port) {
@@ -158,12 +159,9 @@ int main(int argc, char** argv) {
 	char* ip;
 	int port;
 
-	//showing it works. we can delete later.
-	static unsigned char hashCode[65];
-	sha256File("test1.txt", hashCode);
-	printf("hash code: %s\n", hashCode);
 
 
+	recvOne("blah", 0);
 
 
 	if(argc < 3) {
