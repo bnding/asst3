@@ -100,6 +100,9 @@ char** readConfig() {
 	config2d[1] = (char*) malloc(strlen(token) * sizeof(char));
 	config2d[1] = token;
 
+	printf("IP: %s\n", config2d[0]);
+	printf("Port: %s\n", config2d[1]);
+
 	return config2d;
 
 
