@@ -1,9 +1,21 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
 #define delim :
 #define BUFF 8192
 
 //file:content
-void sendOne(char* filePath, char* fileName, int socket) {
+char* encodeFile(char* filePath, char* fileName) {
 	//we already have projectName location on both client and server side. Just need the file name.
+
 
 	int fd = open(filePath, O_RDONLY, 0644);
 	if(fd == -1) {
@@ -30,26 +42,28 @@ void sendOne(char* filePath, char* fileName, int socket) {
 	close(fd);
 
 
-	char msg[BUFF];
-	bzero(msg, BUFF);
-	int fileLen = strlen(filePath);
+	char* msg = (char*) malloc(strlen(fileName) + strlen(content));;
 	strcpy(msg, fileName);
 	sprintf(msg, "%s:%s", msg, content);
-	printf("test\n\n");
-	int n = write(socket, msg, strlen(msg));
-	if (n < 0) {
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
-	printf("test\n\n");
+	printf("encoded message: %s\n", msg);
+	return msg;
 }
 
 
-void recvOne(char* projectPath, int socket) {
-	char msg[BUFF];
-	bzero(msg, BUFF);
-	read(socket, msg, BUFF);
-	printf("%s\n\n", msg);
+char** decodeFile(char* projectName, char* msg) {
+	
+	char* token;
+	token = strtok(msg, ":");
+	char** decoded = (char**) malloc(2 * sizeof(char*));
 
+	decoded[0] = (char*) malloc(strlen(token) * sizeof(char));
+	decoded[0] = token;
 
+	token = strtok(NULL, ":");
+	decoded[1] = (char*) malloc(strlen(token) * sizeof(char));
+	decoded[1] = token;
+
+	printf("file name: %s\n", decoded[0]);
+	printf("file content: %s\n", decoded[1]);
+	return decoded;
 }

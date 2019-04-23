@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "ftp.h"
 
 #define BUFF 8192
 
@@ -84,19 +85,19 @@ int createServer(int port) {
 
 }
 
+
 //takes in the name of the folder its looking for
 //returns 1 if folder exists
 int folderExist(char* lookingFor){
 	struct stat buffer;
 	stat(lookingFor, &buffer);
 
-    	if (S_ISDIR(buffer.st_mode)){
-	    	return 1;
-    	}
+	if (S_ISDIR(buffer.st_mode)){
+		return 1;
+	}
 	return 0;
 
 }
-
 
 void create(char* projectName, int childfd){
 	printf("project name: %s\n", projectName);
@@ -119,49 +120,87 @@ void create(char* projectName, int childfd){
 		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
 		close(fd);
 
+		char* msg = encodeFile(filePath, "/.Manifest");
+		int n = write(childfd, msg, strlen(msg));
 
-
-		int n = write(childfd, "success", strlen("success"));
-		//TODO: FTP here after "success"
-		//sendOne("blanket/test1.txt", "test1.txt", 0);
-		
-		
-		
-		
 		if(n < 0) {
 			fprintf(stderr, "Error. Cannot write to socket\n");
 			exit(0);
 		}
-
 	} else {
 		exit(0);
 	}
+}
 
+void checkout(char* projectName, int childfd) {
+	printf("checkout!\n\n");
 
 
 }
-
 
 void getCommand(int childfd) {
 	char command[BUFF];
 	bzero(command, BUFF);
 
-	int n = read(childfd, command, strlen("create"));
-	
-	if(n < 0) {
-		//fprintf(stderr, "Error, Cannot read from socket");
+	int buflen;
+	int n = read(childfd, (char*)&buflen, sizeof(buflen));
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot read from socket");
 		exit(0);
-	} else {
-		if(strcmp("create", command) == 0) {
-			char projectName[BUFF];
-			n = read(childfd, projectName, BUFF);	
-			memmove(projectName, projectName+1, strlen(projectName));
-			create(projectName, childfd);
+	}
+	buflen = ntohl(buflen);
+	n = read(childfd, command, buflen);
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot read from socket");
+		exit(0);
+	}
+
+	printf("command: %s\n\n", command);
+
+	if(strcmp("create", command) == 0) {
+		char projectName[BUFF];
+
+		n = read(childfd, (char*)&buflen, sizeof(buflen));
+		if (n < 0){
+			fprintf(stderr, "Error. Cannot read from socket");
+			exit(0);
 		}
+		buflen = ntohl(buflen);
+
+		n = read(childfd, projectName, buflen);
+		if (n < 0){
+			fprintf(stderr, "Error. Cannot read from socket");
+			exit(0);
+		}
+
+		create(projectName, childfd);
+	} else if(strcmp("checkout", command) == 0) {
+		printf("going here\n\n");
+		char projectName[BUFF];
+
+		n = read(childfd, (char*)&buflen, sizeof(buflen));
+		if (n < 0){
+			fprintf(stderr, "Error. Cannot read from socket");
+			exit(0);
+		}
+
+		buflen = ntohl(buflen);
+		n = read(childfd, projectName, buflen);
+		if (n < 0){
+			fprintf(stderr, "Error. Cannot read from socket");
+			exit(0);
+		}	
+
+		checkout(projectName, childfd);
+
 	}
 
 
+
 }
+
+
+
 
 
 
@@ -185,8 +224,6 @@ int main(int argc, char** argv) {
 	}
 
 	int port = strtol(argv[1], NULL, 10);
-	//int sockfd;
-
 	int childfd = createServer(port);
 
 	getCommand(childfd);

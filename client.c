@@ -114,36 +114,53 @@ void create(char* projectName) {
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
 
-	//send the message line to the server
-	int n = write(sockfd, "create ", strlen("create "));
+	//TODO: make this another method. 
+	//for command
+	int datalen = strlen("create");
+	int temp = htonl(datalen);
+	int n = write(sockfd, (char*)&temp, sizeof(temp));
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+	n = write(sockfd, "create", datalen);
 	if (n < 0){
 		fprintf(stderr, "Error. Cannot write to socket\n");
 		exit(0);
 	}
 
-	n = write(sockfd, projectName, strlen(projectName));
+
+	//for project name
+	datalen = strlen(projectName);
+	temp = htonl(datalen);
+	n = write(sockfd, (char*)&temp, sizeof(temp));
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+	n = write(sockfd, projectName , datalen);
 	if (n < 0){
 		fprintf(stderr, "Error. Cannot write to socket\n");
 		exit(0);
 	}
 
-	char status[BUFF];
-	bzero(status, BUFF);
-	read(sockfd, status, BUFF);
+	char file[BUFF];
+	bzero(file, BUFF);
+	read(sockfd, file, BUFF);
 
-	printf("status: %s\n\n", status);
+	printf("status: %s\n\n", file);
 
-	if(strcmp(status, "success") == 0) {
+	if(strlen(file) != 0) {
 		printf("Project directory succesfully made on server! Creating directories locally...\n");
 
 		char* filePath = (char*) malloc(strlen(projectName) * sizeof(char));
 		filePath = projectName;
 		mkdir(filePath, 0700);
 
-		//TODO: Receive FTP from server here. Remove this part later...
-		sprintf(filePath, "%s/.Manifest", filePath);
+		char** recFile = decodeFile(projectName, file);
+
+		sprintf(filePath, "%s%s", filePath, recFile[0]);
 		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
-		printf("test\n");
 		close(fd);
 
 	} else {
@@ -152,6 +169,60 @@ void create(char* projectName) {
 	}
 
 	close(sockfd);
+}
+
+
+int folderExist(char* lookingFor){
+	struct stat buffer;
+	stat(lookingFor, &buffer);
+
+	if (S_ISDIR(buffer.st_mode)){
+		return 1;
+	}
+	return 0;
+
+}
+
+
+void checkout(char* projectName) {
+	//TODO zip file from server to client. Need to first check if project exists at the server.
+	
+	char** config = readConfig();
+	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
+	
+
+
+	int datalen = strlen("checkout");
+	int temp = htonl(datalen);
+	int n = write(sockfd, (char*)&temp, sizeof(temp));
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+	n = write(sockfd, "checkout", datalen);
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+
+
+	//for project name
+	datalen = strlen(projectName);
+	temp = htonl(datalen);
+	n = write(sockfd, (char*)&temp, sizeof(temp));
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+	n = write(sockfd, projectName , datalen);
+	if (n < 0){
+		fprintf(stderr, "Error. Cannot write to socket\n");
+		exit(0);
+	}
+
+
+
+
 }
 
 
@@ -179,14 +250,20 @@ int main(int argc, char** argv) {
 
 	} else if (strcmp("checkout", argv[1]) == 0) {
 		if(access(".configure", F_OK) != -1) {
+			checkout(argv[1]);
 			printf("file exists\n");
 		} else {
-			fprintf(stderr, "Error. Configure file does not exist. No valid IP and port.\n");
+			fprintf(stderr, "Error. Configurations not set! No valid IP and port.\n");
 			return 0;
 		}
 	} else if (strcmp("create", argv[1]) == 0) {
-		printf("create\n");
-		create(argv[2]);
+		if(access(".configure", F_OK) != -1) {
+			create(argv[2]);
+		}else {
+			fprintf(stderr, "Error. Configurations not set! No valid IP and port.\n");
+			return 0;
+		}
+
 
 	}
 	return 0;
