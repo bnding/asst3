@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "ftp.h"
+#include "mtp.h"
 
 #define BUFF 8192
 
@@ -121,12 +122,8 @@ void create(char* projectName, int childfd){
 		close(fd);
 
 		char* msg = encodeFile(filePath, "/.Manifest");
-		int n = write(childfd, msg, strlen(msg));
+		sendMsg(msg, childfd);
 
-		if(n < 0) {
-			fprintf(stderr, "Error. Cannot write to socket\n");
-			exit(0);
-		}
 	} else {
 		exit(0);
 	}
@@ -142,54 +139,18 @@ void getCommand(int childfd) {
 	char command[BUFF];
 	bzero(command, BUFF);
 
-	int buflen;
-	int n = read(childfd, (char*)&buflen, sizeof(buflen));
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot read from socket");
-		exit(0);
-	}
-	buflen = ntohl(buflen);
-	n = read(childfd, command, buflen);
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot read from socket");
-		exit(0);
-	}
-
+	recMsg(command, childfd);
 	printf("command: %s\n\n", command);
 
 	if(strcmp("create", command) == 0) {
 		char projectName[BUFF];
 
-		n = read(childfd, (char*)&buflen, sizeof(buflen));
-		if (n < 0){
-			fprintf(stderr, "Error. Cannot read from socket");
-			exit(0);
-		}
-		buflen = ntohl(buflen);
-
-		n = read(childfd, projectName, buflen);
-		if (n < 0){
-			fprintf(stderr, "Error. Cannot read from socket");
-			exit(0);
-		}
+		recMsg(projectName, childfd);
 
 		create(projectName, childfd);
 	} else if(strcmp("checkout", command) == 0) {
-		printf("going here\n\n");
 		char projectName[BUFF];
-
-		n = read(childfd, (char*)&buflen, sizeof(buflen));
-		if (n < 0){
-			fprintf(stderr, "Error. Cannot read from socket");
-			exit(0);
-		}
-
-		buflen = ntohl(buflen);
-		n = read(childfd, projectName, buflen);
-		if (n < 0){
-			fprintf(stderr, "Error. Cannot read from socket");
-			exit(0);
-		}	
+		recMsg(projectName, childfd);
 
 		checkout(projectName, childfd);
 

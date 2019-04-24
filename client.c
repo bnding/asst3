@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include "sha256.h"
 #include "ftp.h"
+#include "mtp.h"
 
 #define BUFF 8192
 
@@ -101,52 +102,20 @@ char** readConfig() {
 	config2d[1] = (char*) malloc(strlen(token) * sizeof(char));
 	config2d[1] = token;
 
-	printf("IP: %s\n", config2d[0]);
-	printf("Port: %s\n", config2d[1]);
-
 	return config2d;
-
-
 }
 
 void create(char* projectName) {
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
-
-	//TODO: make this another method. 
-	//for command
-	int datalen = strlen("create");
-	int temp = htonl(datalen);
-	int n = write(sockfd, (char*)&temp, sizeof(temp));
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
-	n = write(sockfd, "create", datalen);
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
-
-
-	//for project name
-	datalen = strlen(projectName);
-	temp = htonl(datalen);
-	n = write(sockfd, (char*)&temp, sizeof(temp));
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
-	n = write(sockfd, projectName , datalen);
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
+	sendMsg("create", sockfd);
+	sendMsg(projectName, sockfd);
 
 	char file[BUFF];
 	bzero(file, BUFF);
-	read(sockfd, file, BUFF);
+	recMsg(file, sockfd);
+
 
 	printf("status: %s\n\n", file);
 
@@ -190,35 +159,8 @@ void checkout(char* projectName) {
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 	
-
-
-	int datalen = strlen("checkout");
-	int temp = htonl(datalen);
-	int n = write(sockfd, (char*)&temp, sizeof(temp));
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
-	n = write(sockfd, "checkout", datalen);
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
-
-
-	//for project name
-	datalen = strlen(projectName);
-	temp = htonl(datalen);
-	n = write(sockfd, (char*)&temp, sizeof(temp));
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
-	n = write(sockfd, projectName , datalen);
-	if (n < 0){
-		fprintf(stderr, "Error. Cannot write to socket\n");
-		exit(0);
-	}
+	sendMsg("checkout", sockfd);
+	sendMsg(projectName, sockfd);
 
 
 
@@ -229,11 +171,6 @@ void checkout(char* projectName) {
 int main(int argc, char** argv) {
 	char* ip;
 	int port;
-
-
-
-	//recvOne("blah", 0);
-
 
 	if(argc < 3) {
 		fprintf(stderr, "Error. Invalid number of inputs.\n");
@@ -267,7 +204,4 @@ int main(int argc, char** argv) {
 
 	}
 	return 0;
-
-
-
 }
