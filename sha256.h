@@ -1,4 +1,5 @@
 #include <openssl/sha.h>
+#include "zlib.h"
 
 void hashString (unsigned char hash[SHA256_DIGEST_LENGTH], char hashBuff[65]) {
 	int i;

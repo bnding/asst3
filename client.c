@@ -11,6 +11,7 @@
 #include "sha256.h"
 #include "ftp.h"
 #include "mtp.h"
+#include "zlib.h"
 
 #define BUFF 8192
 
@@ -141,26 +142,48 @@ void create(char* projectName) {
 }
 
 
-int folderExist(char* lookingFor){
-	struct stat buffer;
-	stat(lookingFor, &buffer);
-
-	if (S_ISDIR(buffer.st_mode)){
-		return 1;
-	}
-	return 0;
-
-}
-
-
 void checkout(char* projectName) {
 	//TODO zip file from server to client. Need to first check if project exists at the server.
-	
+
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
-	
+
 	sendMsg("checkout", sockfd);
 	sendMsg(projectName, sockfd);
+
+	char msg[BUFF];
+	recMsg(msg, sockfd); 
+
+	if(strcmp("exists", msg) == 0) {
+		printf("Project exists at server. Continuing...\n");
+		char compFile[BUFF];
+		read(sockfd,compFile,BUFF);
+
+		gzFile inFile = gzopen(compFile, "rb");
+
+
+		char path[BUFF];
+		sprintf(path, "%s/zippedFile.gz", path);
+		FILE *outFile = fopen(path, "wb");
+
+		if (!inFile || !outFile) printf("ERROR\n\n\n"); return;
+
+
+		char buffer[BUFF];
+		int num_read = 0;
+
+		while ((num_read = gzread(inFile, buffer, sizeof(buffer))) > 0) {
+			fwrite(buffer, 1, num_read, outFile);
+		}
+
+
+
+		gzclose(inFile);
+		fclose(outFile);
+	} else if(strcmp("no path", msg) == 0) {
+		fprintf(stderr, "Project does not exist in server! Exiting...\n");
+		exit(0);
+	}
 
 
 
@@ -171,7 +194,6 @@ void checkout(char* projectName) {
 int main(int argc, char** argv) {
 	char* ip;
 	int port;
-
 	if(argc < 3) {
 		fprintf(stderr, "Error. Invalid number of inputs.\n");
 		return 0; 
@@ -187,8 +209,7 @@ int main(int argc, char** argv) {
 
 	} else if (strcmp("checkout", argv[1]) == 0) {
 		if(access(".configure", F_OK) != -1) {
-			checkout(argv[1]);
-			printf("file exists\n");
+			checkout(argv[2]);
 		} else {
 			fprintf(stderr, "Error. Configurations not set! No valid IP and port.\n");
 			return 0;

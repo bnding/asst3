@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include "ftp.h"
 #include "mtp.h"
+#include "zlib.h"
 
 #define BUFF 8192
 
@@ -129,11 +130,83 @@ void create(char* projectName, int childfd){
 	}
 }
 
-void checkout(char* projectName, int childfd) {
-	printf("checkout!\n\n");
-
-
+int isFile(const char* path) {
+	struct stat path_stat;
+	stat(path, &path_stat);
+	return S_ISREG(path_stat.st_mode);
 }
+
+
+void checkout(char* projectName, gzFile outFile, int childfd) {
+	char path[BUFF];
+	sprintf(path, ".server_repo/%s", projectName);
+	if (folderExist(path)) {
+		sendMsg("exists", childfd);
+		DIR *dir = opendir(path);
+		struct dirent* entry;
+
+		if(!(dir = opendir(path))) {
+			return;
+		}
+
+		FILE *fp;
+		char ch;
+		int size = 0;
+
+		unsigned long totalRead = 0;
+		unsigned long totalWrite = 0;
+
+		while ((entry = readdir(dir)) != NULL) {
+
+			if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && strcmp(entry->d_name, "zippedFile.gz") != 0){
+				int x = 0;
+				char buffer[BUFF];
+				char fileLen[BUFF];
+				char filePath[BUFF];
+				sprintf(filePath, "%s/%s", path, entry->d_name);
+				gzwrite(outFile, filePath, strlen(filePath));
+
+				if (entry->d_type == DT_DIR) {
+					//directory
+					char path[1024];
+					snprintf(path, sizeof(path), "%s/%s", projectName, entry->d_name);
+					gzwrite(outFile, " D -1\n", strlen(" D -1\n"));
+					checkout(path, outFile, childfd);
+				} else {
+					//files
+					gzwrite(outFile, " R ", strlen(" R "));
+					fp = fopen(filePath, "rb");
+					while((x = fread(fileLen, 1, sizeof(fileLen), fp)) > 0) {
+					}
+					fseek(fp, 0L, SEEK_END);
+					size = ftell(fp);
+					char numStr[BUFF];
+					snprintf(numStr, sizeof(numStr), "%d", size);
+					gzwrite(outFile, numStr, strlen(numStr));
+					fclose(fp);
+
+					x = 0;
+					fp = fopen(filePath, "rb");
+					gzwrite(outFile, "\n", strlen("\n"));
+					while((x = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+						totalRead += x;
+						sprintf(buffer, "%s", buffer);
+						gzwrite(outFile, buffer, x);
+					}	       
+					fseek(fp, 0L, SEEK_END);
+					size = ftell(fp);
+					fclose(fp);
+				}
+			}
+		}
+		closedir(dir);
+	} else {
+		sendMsg("no path", childfd);
+		exit(0);
+	}
+}
+
+
 
 void getCommand(int childfd) {
 	char command[BUFF];
@@ -150,21 +223,22 @@ void getCommand(int childfd) {
 		create(projectName, childfd);
 	} else if(strcmp("checkout", command) == 0) {
 		char projectName[BUFF];
+		char gzLoc[BUFF];
+
 		recMsg(projectName, childfd);
+		sprintf(gzLoc, ".server_repo/%s/zippedFile.gz", projectName);
 
-		checkout(projectName, childfd);
+		gzFile outFile = gzopen(gzLoc, "wb");
+		checkout(projectName, outFile, childfd);
+		gzclose(outFile);
 
+		char msg[BUFF];
+		FILE *f = fopen(gzLoc, "r");
+		fscanf(f, "%s", msg);
+		printf("message sent\n======================\n%s", msg);
+		write(childfd, msg, BUFF);
 	}
-
-
-
 }
-
-
-
-
-
-
 
 int main(int argc, char** argv) {
 	if(argc < 2) {
