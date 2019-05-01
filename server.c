@@ -206,6 +206,21 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 	}
 }
 
+void commit(char* projectName, int childfd) {
+	printf("commit\n");
+	char path[BUFF];
+	sprintf(path, ".server_repo/%s", projectName);
+
+	if(folderExist(path)) {
+		sendMsg("folder exists", childfd);
+	} else {
+		sendMsg("no path", childfd);
+		exit(0);
+	}
+
+
+}
+
 
 
 void getCommand(int childfd) {
@@ -213,8 +228,7 @@ void getCommand(int childfd) {
 	bzero(command, BUFF);
 
 	recMsg(command, childfd);
-	printf("command: %s\n\n", command);
-
+	printf("command: %s\n", command);
 	if(strcmp("create", command) == 0) {
 		char projectName[BUFF];
 
@@ -234,11 +248,14 @@ void getCommand(int childfd) {
 
 		char msg[BUFF];
 		gzFile f = gzopen(gzLoc, "r");
-		//fscanf(f, "%s", msg);
-		//printf("message sent\n======================\n%s", msg);
 		sendCompress(gzLoc, childfd);
 		write(childfd, f, BUFF);
 		gzclose(f);
+	} else if (strcmp("commit", command) == 0) {
+		char projectName[BUFF];
+		recMsg(projectName, childfd);
+		printf("project name: %s\n", projectName);
+		commit(projectName, childfd);
 	}
 }
 
@@ -273,7 +290,6 @@ int main(int argc, char** argv) {
 	// pthread_join(thread_id, NULL);
 
 
-	//close(sockfd);
 	close(childfd);
 	exit(0);
 

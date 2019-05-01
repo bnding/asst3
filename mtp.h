@@ -9,10 +9,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "zlib.h"
-
-
-
-
 #define BUFF 8192
 
 void sendMsg(char* msg, int sockfd) {

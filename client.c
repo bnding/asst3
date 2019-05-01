@@ -188,11 +188,7 @@ int folderExist(char* lookingFor){
 
 }
 
-
-
 void checkout(char* projectName) {
-	
-
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
@@ -220,34 +216,68 @@ void checkout(char* projectName) {
 		char** arr = makeArr(compStr, count, "\n");
 
 		mkdir(projectName, 0700);
-
 		printf("Decompressing and extracting the following files and directories to %s in client...\n", projectName);
-		int i;
-		for(i = 0; arr[i] != NULL; i++){
-			count = wordCount(arr[i]);
-			char** currLine = makeArr(arr[i], count, " ");
-			currLine[0] += strlen(".server_repo/");
 
-			if(count == 3 && strcmp(currLine[1], "R") == 0) {
-				printf("file: %s\n", currLine[0]);
-				FILE *fd = fopen(currLine[0], "w");
-				fprintf(fd, arr[i+1]);
-				++i;
+		int i;
+		char* currFile;
+		FILE* fd;
+		for(i = 0; arr[i+1] != NULL; i++) {
+			count = wordCount(arr[i]);
+			char* currLine = (char*) malloc(strlen(arr[i]) * sizeof(char));
+			currLine = arr[i];
+			if(strstr(currLine, ".server_repo/") != NULL) {
+				currLine += strlen(".server_repo/");
+				printf("file or dir: %s\n\n", currLine);
+			}
+			char buffer[BUFF];
+			bzero(buffer, BUFF);
+			sprintf(buffer, arr[i], strlen(arr[i]));
+			char** currArr = makeArr(arr[i], count, " ");
+			printf("currLine: %s\n", buffer);
+
+			if(count == 3 && strcmp(currArr[1], "R") == 0) {
+				printf("file: %s\n", currLine);
+				currFile = currLine;
+				fd = fopen(currFile, "w");
+			} else if (count == 3 && strcmp(currArr[1], "D") == 0){
+				printf("directory: %s\n", currLine);
+				mkdir(currLine, 0700);
 			} else {
-				printf("directory: %s\n", currLine[0]);
-				mkdir(currLine[0], 0700);
+				printf("buffer: %s\n", buffer);
+				fprintf(fd, "%s\n", buffer);
 			}
 		}
-
+		fclose(fd);
 		printf("Success! Compressed files unzipped and brought to client.\n");
 		exit(0);
-
-
-
 	} else if(strcmp("no path", msg) == 0) {
 		fprintf(stderr, "Project does not exist in server! Exiting...\n");
 		exit(0);
 	}
+}
+
+
+
+void commit(char* projectName) {
+	char** config = readConfig();
+	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
+
+	printf("commit\n");
+	sendMsg("commit", sockfd);
+	sendMsg(projectName, sockfd);
+
+	char msg[BUFF];
+	recMsg(msg, sockfd);
+
+	if(strcmp("folder exists", msg) == 0) {
+		printf("folder exists!\n");
+
+
+	} else {
+		fprintf(stderr, "Error. Folder does not exist at server.\nTerminating...\n");
+		exit(0);
+	}
+
 
 
 
@@ -285,8 +315,14 @@ int main(int argc, char** argv) {
 			fprintf(stderr, "Error. Configurations not set! No valid IP and port.\n");
 			return 0;
 		}
-
-
+	} else if (strcmp("commit", argv[1]) == 0) {
+		if(access(".configure", F_OK) != -1) {
+			printf("commit!\n");
+			commit(argv[2]);
+		} else {
+			fprintf(stderr, "Error. Configurations not set! No valid IP and port.\n");
+			return 0;
+		}
 	}
 	return 0;
 }
