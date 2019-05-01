@@ -104,23 +104,22 @@ int folderExist(char* lookingFor){
 void create(char* projectName, int childfd){
 	printf("project name: %s\n", projectName);
 	printf("length: %d\n", strlen(projectName));
-	//creates ServerRepo if dne
-	if(folderExist(".server_repo") == 0){
-		mkdir(".server_repo", 0700);
-	}
+
+	mkdir(".server_repo", 0700);
 
 	//makes the file in ServerRepo 
 	char filePath[BUFF];
 
 	sprintf(filePath, ".server_repo/%s", projectName);
-	printf("attempting to create project in path: %s\n", filePath);
+	//printf("attempting to create project in path: %s\n", filePath);
 
-	if(folderExist(filePath) == 0){
-		mkdir(filePath, 0700);
+	if(mkdir(filePath, 0700) == 0){
+		//mkdir(filePath, 0700);
 
 		sprintf(filePath, "%s/.Manifest", filePath);
-		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
-		close(fd);
+		FILE *fd = fopen(filePath, "w");
+		fprintf(fd, "1\n");
+		fclose(fd);
 
 		char* msg = encodeFile(filePath, "/.Manifest");
 		sendMsg(msg, childfd);
@@ -199,6 +198,7 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 				}
 			}
 		}
+
 		closedir(dir);
 	} else {
 		sendMsg("no path", childfd);
@@ -233,10 +233,12 @@ void getCommand(int childfd) {
 		gzclose(outFile);
 
 		char msg[BUFF];
-		FILE *f = fopen(gzLoc, "r");
-		fscanf(f, "%s", msg);
-		printf("message sent\n======================\n%s", msg);
-		write(childfd, msg, BUFF);
+		gzFile f = gzopen(gzLoc, "r");
+		//fscanf(f, "%s", msg);
+		//printf("message sent\n======================\n%s", msg);
+		sendCompress(gzLoc, childfd);
+		write(childfd, f, BUFF);
+		gzclose(f);
 	}
 }
 

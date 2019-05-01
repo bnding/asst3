@@ -117,7 +117,6 @@ void create(char* projectName) {
 	bzero(file, BUFF);
 	recMsg(file, sockfd);
 
-
 	printf("status: %s\n\n", file);
 
 	if(strlen(file) != 0) {
@@ -130,8 +129,9 @@ void create(char* projectName) {
 		char** recFile = decodeFile(projectName, file);
 
 		sprintf(filePath, "%s%s", filePath, recFile[0]);
-		int fd = open(filePath, O_CREAT | O_RDWR, 0644);
-		close(fd);
+		FILE *fd = fopen(filePath, "w");
+		fprintf(fd, "1\n");
+		fclose(fd);
 
 	} else {
 		fprintf(stderr, "Error. Project with name already exists!\n");
@@ -141,45 +141,109 @@ void create(char* projectName) {
 	close(sockfd);
 }
 
+void traverse(char** arr, int numWords){
+	int i;
+	for(i = 0; i < numWords; i++){
+		printf("%s\n", arr[i]);
+	}
+}
+
+int wordCount(char* sentence){
+	int count = 0;
+	int flag = 0;
+	int i;
+	for(i = 0; i < strlen(sentence); i++){
+		if(flag == 0 && !isspace(sentence[i])){
+			count++;
+			flag = 1;
+		} else if (isspace(sentence[i])){
+			flag = 0;
+		}
+	}
+	return count;
+}
+
+//parses sentence into array
+char** makeArr(char* sentence, int numWords, char* delimiter){
+	char** arr2 = (char**) malloc(numWords * sizeof(char*));
+	char* word = strtok(sentence, delimiter);
+	int count = 0;
+
+	while(word != NULL){
+		arr2[count] = word;
+		word = strtok(NULL, delimiter);
+		count++;
+	}
+	return arr2;
+}
+
+int folderExist(char* lookingFor){
+	struct stat buffer;
+	stat(lookingFor, &buffer);
+
+	if (S_ISDIR(buffer.st_mode)){
+		return 1;
+	}
+	return 0;
+
+}
+
+
 
 void checkout(char* projectName) {
-	//TODO zip file from server to client. Need to first check if project exists at the server.
+	
 
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
+
+	if(folderExist(projectName) != 0) {
+		fprintf(stderr, "Error. Project already exists at the client! Exiting...\n");
+		exit(0);
+	}
 
 	sendMsg("checkout", sockfd);
 	sendMsg(projectName, sockfd);
 
 	char msg[BUFF];
+	//for some reason checkout is sending "exists" twice from server...
 	recMsg(msg, sockfd); 
+	recMsg(msg, sockfd);
 
 	if(strcmp("exists", msg) == 0) {
 		printf("Project exists at server. Continuing...\n");
-		char compFile[BUFF];
-		read(sockfd,compFile,BUFF);
 
-		gzFile inFile = gzopen(compFile, "rb");
+		char compMsg[BUFF];
+		recMsg(compMsg, sockfd);
 
+		char* compStr = compMsg;
+		int count = wordCount(compStr);
+		char** arr = makeArr(compStr, count, "\n");
 
-		char path[BUFF];
-		sprintf(path, "%s/zippedFile.gz", path);
-		FILE *outFile = fopen(path, "wb");
+		mkdir(projectName, 0700);
 
-		if (!inFile || !outFile) printf("ERROR\n\n\n"); return;
+		printf("Decompressing and extracting the following files and directories to %s in client...\n", projectName);
+		int i;
+		for(i = 0; arr[i] != NULL; i++){
+			count = wordCount(arr[i]);
+			char** currLine = makeArr(arr[i], count, " ");
+			currLine[0] += strlen(".server_repo/");
 
-
-		char buffer[BUFF];
-		int num_read = 0;
-
-		while ((num_read = gzread(inFile, buffer, sizeof(buffer))) > 0) {
-			fwrite(buffer, 1, num_read, outFile);
+			if(count == 3 && strcmp(currLine[1], "R") == 0) {
+				printf("file: %s\n", currLine[0]);
+				FILE *fd = fopen(currLine[0], "w");
+				fprintf(fd, arr[i+1]);
+				++i;
+			} else {
+				printf("directory: %s\n", currLine[0]);
+				mkdir(currLine[0], 0700);
+			}
 		}
 
+		printf("Success! Compressed files unzipped and brought to client.\n");
+		exit(0);
 
 
-		gzclose(inFile);
-		fclose(outFile);
+
 	} else if(strcmp("no path", msg) == 0) {
 		fprintf(stderr, "Project does not exist in server! Exiting...\n");
 		exit(0);

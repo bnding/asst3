@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "zlib.h"
 
 
 
@@ -43,4 +44,15 @@ void recMsg(char msg[BUFF], int sockfd) {
 		exit(0);
 	}
 
+}
+
+
+void sendCompress(char* filePath, int sockfd) {
+	gzFile fd = gzopen(filePath, "rb");
+	char buffer[BUFF];
+	while(gzread(fd, buffer, BUFF) > 0) {
+	       sprintf(buffer, "%s", buffer);
+	}	       
+
+	sendMsg(buffer, sockfd);
 }
