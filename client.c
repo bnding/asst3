@@ -46,6 +46,8 @@ int connectServer(char* ip, int port) {
 		printf("Successfully connected to server!\n");
 	}
 
+
+	printf("SOCKET: %d\n\n", sock);
 	return sock;
 }
 
@@ -115,6 +117,7 @@ void create(char* projectName) {
 
 	char file[BUFF];
 	bzero(file, BUFF);
+	printf("SOCKFD: %d\n\n", sockfd);
 	recMsg(file, sockfd);
 
 	printf("status: %s\n\n", file);
@@ -216,7 +219,7 @@ void checkout(char* projectName) {
 		char** arr = makeArr(compStr, count, "\n");
 
 		mkdir(projectName, 0700);
-		printf("Decompressing and extracting the following files and directories to %s in client...\n", projectName);
+		printf("Decompressing and extracting the following files and directories to %s in client...\n\n", projectName);
 
 		int i;
 		char* currFile;
@@ -227,28 +230,25 @@ void checkout(char* projectName) {
 			currLine = arr[i];
 			if(strstr(currLine, ".server_repo/") != NULL) {
 				currLine += strlen(".server_repo/");
-				printf("file or dir: %s\n\n", currLine);
 			}
 			char buffer[BUFF];
 			bzero(buffer, BUFF);
 			sprintf(buffer, arr[i], strlen(arr[i]));
-			char** currArr = makeArr(arr[i], count, " ");
-			printf("currLine: %s\n", buffer);
+			char** currArr = makeArr(arr[i], count, " \t");
 
 			if(count == 3 && strcmp(currArr[1], "R") == 0) {
-				printf("file: %s\n", currLine);
+				printf("Making file: %s\n", currLine);
 				currFile = currLine;
 				fd = fopen(currFile, "w");
 			} else if (count == 3 && strcmp(currArr[1], "D") == 0){
-				printf("directory: %s\n", currLine);
+				printf("Making directory: %s\n", currLine);
 				mkdir(currLine, 0700);
 			} else {
-				printf("buffer: %s\n", buffer);
 				fprintf(fd, "%s\n", buffer);
 			}
 		}
 		fclose(fd);
-		printf("Success! Compressed files unzipped and brought to client.\n");
+		printf("Success! Compressed files unzipped and brought to client. Removing compressed file at server...\n");
 		exit(0);
 	} else if(strcmp("no path", msg) == 0) {
 		fprintf(stderr, "Project does not exist in server! Exiting...\n");
@@ -262,7 +262,6 @@ void commit(char* projectName) {
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
-	printf("commit\n");
 	sendMsg("commit", sockfd);
 	sendMsg(projectName, sockfd);
 
@@ -270,13 +269,92 @@ void commit(char* projectName) {
 	recMsg(msg, sockfd);
 
 	if(strcmp("folder exists", msg) == 0) {
-		printf("folder exists!\n");
+		printf("Folder exists at server! Continuing...\n");
+		char updateBuff[BUFF];
+		sprintf(updateBuff, "%s/%s", projectName, ".Update", strlen(projectName), strlen(".Update"));
+		printf("update file: %s\n", updateBuff);
+
+		if(access(updateBuff, F_OK) != -1) {
+			printf(".update exists.\n");
+			int size;
+			FILE* fp = fopen(updateBuff, "r");
+			if (NULL != fp) {
+				fseek (fp, 0, SEEK_END);
+				size = ftell(fp);
+
+				if (size == 0) {
+					printf("Initial cases passed! Continuing...\n");
+				} else {
+					fprintf(stderr, "Error. Files are not updated.\n");
+					exit(0);
+				}
+			}
+		} else {
+			printf(".update does not exist.\n");
+			printf("Initial cases passed! Continuing...\n");
+		}
+
+
+		//TODO start commit here
+
 
 
 	} else {
-		fprintf(stderr, "Error. Folder does not exist at server.\nTerminating...\n");
+		fprintf(stderr, "Error. Project does not exist at server.\nTerminating...\n");
 		exit(0);
 	}
+}
+
+
+void currentVersion(char* projectName) {
+	char** config = readConfig();
+	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
+
+	sendMsg("currentversion", sockfd);
+	sendMsg(projectName, sockfd);
+
+	char msg[BUFF];
+	recMsg(msg, sockfd);
+
+	if(strcmp("folder exists", msg) == 0) {
+		printf("Folder exists at server! Continuing...\n");
+		char manifest[BUFF];
+		recMsg(manifest, sockfd);
+
+		char * curLine = manifest;
+		char** currLineArr;
+
+		printf("CURRENT VERSION OF PROJECT FILES AT SERVER\n==========================================\n");
+		while(curLine)
+		{
+			char * nextLine = strchr(curLine, '\n');
+			if (nextLine) *nextLine = '\0';  // temporarily terminate the current line
+			int count = wordCount(curLine);	
+			currLineArr = makeArr(curLine, count, "\t");
+			if(count == 1) {
+				printf("%s/.Manifest\tver. %s\n", projectName, currLineArr[0]);
+			} else if (count == 3){
+				printf("%s/%s\tver. %s\n", projectName, currLineArr[1], currLineArr[0]);
+			}
+
+			if (nextLine) *nextLine = '\n'; 
+			curLine = nextLine ? (nextLine+1) : NULL;
+		}
+	} else {
+		fprintf(stderr, "Error. Project does not exist at server.\nTerminating...\n");
+		exit(0);
+	}
+}
+
+
+void destroy(char* projectName) {
+	printf("destroy\n");
+	char** config = readConfig();
+	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
+	
+	sendMsg("destroy", sockfd);
+	sendMsg(projectName, sockfd);
+
 
 
 
@@ -322,6 +400,18 @@ int main(int argc, char** argv) {
 		} else {
 			fprintf(stderr, "Error. Configurations not set! No valid IP and port.\n");
 			return 0;
+		}
+	} else if (strcmp("currentversion", argv[1]) == 0) {
+		if(access(".configure", F_OK) != -1) {
+			printf("currentversion\n");
+			currentVersion(argv[2]);
+		} else {
+			fprintf(stderr, "Error. Configurations not set! No valid IP and port.\n");
+			return 0;
+		}
+	} else if (strcmp("destroy", argv[1]) == 0) {
+		if(access(".configure", F_OK) != -1) {
+			destroy(argv[2]);
 		}
 	}
 	return 0;

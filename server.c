@@ -10,82 +10,37 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <semaphore.h>
 #include "ftp.h"
 #include "mtp.h"
 #include "zlib.h"
-
 #define BUFF 8192
 
+typedef struct list {
+	pthread_t id;
+	struct list *next;
+} list;
+
+list* head;
 
 int run = 1;
-
-void *myThread(void *vargp) {
-	int i = 0;
-	while(1) {
-		printf("thread workload: %d\n", i);
-		i++;
-		sleep(1);
-	}
-	return NULL;
-}
-
 void signalHandler() {
 	run = 0;
 }
+
+int childfd;
+
 
 void handlerExit() {
 	printf("\nTerminating...\n");
 }
 
-int createServer(int port) {
-	int connfd, len;
-	struct sockaddr_in serverAddr, client;
 
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd < 0) {
-		fprintf(stderr, "Error. Socket creation failed.\n");
-		exit(0);
-	} else {
-		printf("Socket successfully created!\n");
-	}
-
-	bzero(&serverAddr, sizeof(serverAddr));
-
-	if(port < 8000 || port > 64000) {
-		fprintf(stderr, "Error. Server port is not within range!\n");
-		exit(0);
-	}
-
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serverAddr.sin_port = htons(port);
-
-	if((bind(sockfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr))) != 0) {
-		fprintf(stderr, "Error. socket bind failed.\n");
-		exit(0);
-	} else {
-		printf("Socket successfully binded!\n");
-	}
-
-	if ((listen(sockfd, 5)) != 0) {
-		fprintf(stderr, "Error. Listen failed.\n");
-		exit(0);
-	} else {
-		printf("Server listening...\n");
-	}
-	len = sizeof(client);
-
-	connfd = accept(sockfd, (struct sockaddr*)&client, &len);
-	if(connfd < 0) {
-		fprintf(stderr, "Error. Server accept failed.\n");
-		exit(0);
-	} else {
-		printf("Server accepted to client!\n");
-	}
-
-	return connfd;
-
-}
+pthread_mutex_t mLock1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock2 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock3 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock4 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock5 = PTHREAD_MUTEX_INITIALIZER;
 
 
 //takes in the name of the folder its looking for
@@ -101,10 +56,8 @@ int folderExist(char* lookingFor){
 
 }
 
-void create(char* projectName, int childfd){
-	printf("project name: %s\n", projectName);
-	printf("length: %d\n", strlen(projectName));
-
+void create(char* projectName){
+	pthread_mutex_lock(&mLock2);
 	mkdir(".server_repo", 0700);
 
 	//makes the file in ServerRepo 
@@ -114,7 +67,6 @@ void create(char* projectName, int childfd){
 	//printf("attempting to create project in path: %s\n", filePath);
 
 	if(mkdir(filePath, 0700) == 0){
-		//mkdir(filePath, 0700);
 
 		sprintf(filePath, "%s/.Manifest", filePath);
 		FILE *fd = fopen(filePath, "w");
@@ -127,6 +79,7 @@ void create(char* projectName, int childfd){
 	} else {
 		exit(0);
 	}
+	pthread_mutex_unlock(&mLock2);
 }
 
 int isFile(const char* path) {
@@ -199,6 +152,8 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 			}
 		}
 
+
+
 		closedir(dir);
 	} else {
 		sendMsg("no path", childfd);
@@ -209,6 +164,7 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 void commit(char* projectName, int childfd) {
 	printf("commit\n");
 	char path[BUFF];
+	bzero(path, BUFF);
 	sprintf(path, ".server_repo/%s", projectName);
 
 	if(folderExist(path)) {
@@ -221,20 +177,54 @@ void commit(char* projectName, int childfd) {
 
 }
 
+void currentVersion(char* projectName, int childfd) {
+	char projectPath[BUFF];
+	bzero(projectPath, BUFF);
+	sprintf(projectPath, ".server_repo/%s", projectName);
+
+	if(folderExist(projectPath)) {
+		sendMsg("folder exists", childfd);
+		sprintf(projectPath, "%s/.Manifest", projectPath, strlen(projectPath), strlen("/.Manifest"));
+
+		FILE* fp = fopen(projectPath, "r");
+		char buffer[BUFF];
+		int x;
+
+		while((x = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+			sprintf(buffer, "%s", buffer);
+		}
+
+		sendMsg(buffer, childfd);
+	} else {
+		sendMsg("no path", childfd);
+		exit(0);
+	}
+}
 
 
-void getCommand(int childfd) {
+void destroy(char* projectName, int childfd) {
+	printf("destroy\n");
+	char projectPath[BUFF];
+	bzero(projectPath, BUFF);
+	sprintf(projectPath, ".server_repo/%s", projectName);
+
+
+}
+
+
+
+
+void* getCommand() {
+	pthread_mutex_lock(&mLock1);
 	char command[BUFF];
 	bzero(command, BUFF);
-
 	recMsg(command, childfd);
 	printf("command: %s\n", command);
 	if(strcmp("create", command) == 0) {
 		char projectName[BUFF];
-
 		recMsg(projectName, childfd);
 
-		create(projectName, childfd);
+		create(projectName);
 	} else if(strcmp("checkout", command) == 0) {
 		char projectName[BUFF];
 		char gzLoc[BUFF];
@@ -250,13 +240,95 @@ void getCommand(int childfd) {
 		gzFile f = gzopen(gzLoc, "r");
 		sendCompress(gzLoc, childfd);
 		write(childfd, f, BUFF);
+		remove(gzLoc);
 		gzclose(f);
 	} else if (strcmp("commit", command) == 0) {
 		char projectName[BUFF];
 		recMsg(projectName, childfd);
-		printf("project name: %s\n", projectName);
 		commit(projectName, childfd);
+	} else if (strcmp("currentversion", command) == 0) {
+		char projectName[BUFF];
+		recMsg(projectName, childfd);
+		currentVersion(projectName, childfd);
+	} else if (strcmp("destroy", command) == 0) {
+		char projectName[BUFF];
+		recMsg(projectName, childfd);
+		destroy(projectName, childfd);
 	}
+	pthread_mutex_unlock(&mLock1);
+}
+
+void* commandThread(void* socket) {
+	getCommand(*(int*) socket);
+}
+
+
+void* createServer(int port) {
+	int connfd, len;
+	struct sockaddr_in serverAddr, client;
+
+	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(sockfd < 0) {
+		fprintf(stderr, "Error. Socket creation failed.\n");
+		exit(0);
+	} else {
+		printf("Socket successfully created!\n");
+	}
+
+	bzero(&serverAddr, sizeof(serverAddr));
+
+	if(port < 8000 || port > 64000) {
+		fprintf(stderr, "Error. Server port is not within range!\n");
+		exit(0);
+	}
+
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serverAddr.sin_port = htons(port);
+
+	if((bind(sockfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr))) != 0) {
+		fprintf(stderr, "Error. socket bind failed.\n");
+		exit(0);
+	} else {
+		printf("Socket successfully binded!\n");
+	}
+
+	if ((listen(sockfd, 5)) != 0) {
+		fprintf(stderr, "Error. Listen failed.\n");
+		exit(0);
+	} else {
+		printf("Server listening...\n");
+	}
+	len = sizeof(client);
+
+	connfd = accept(sockfd, (struct sockaddr*)&client, &len);
+	if(connfd < 0) {
+		fprintf(stderr, "Error. Server accept failed.\n");
+		exit(0);
+	} else {
+		printf("Server accepted to client!\n");
+	}
+
+	childfd = connfd;
+
+
+
+	list* temp = (list*) malloc(sizeof(struct list));
+	head = temp;
+	head -> next = NULL;
+
+	void* vport = &port;
+
+	pthread_create(&head->id, NULL, &commandThread, vport);
+	pthread_join(head->id, NULL);
+	list* t1 = head;
+	list* oldThread = head;
+	t1 = t1->next;
+
+}
+
+void* myThread(void* port) {
+	createServer(*(int*)port);
 }
 
 int main(int argc, char** argv) {
@@ -278,16 +350,21 @@ int main(int argc, char** argv) {
 	}
 
 	int port = strtol(argv[1], NULL, 10);
-	int childfd = createServer(port);
+
+	list* temp = (list*) malloc(sizeof(struct list));
+	head = temp;
+	head -> next = NULL;
+
+	void* vport = &port;
+
+	pthread_create(&head->id, NULL, myThread, vport);
+	pthread_join(head->id, NULL);
+	list* t1 = head;
+	list* oldThread = head;
+	t1 = t1->next;
+	free(oldThread);
 
 	getCommand(childfd);
-
-
-
-
-	// pthread_t thread_id;
-	// pthread_create(&thread_id, NULL, myThread, NULL);
-	// pthread_join(thread_id, NULL);
 
 
 	close(childfd);
