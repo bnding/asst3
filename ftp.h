@@ -45,12 +45,11 @@ char* encodeFile(char* filePath, char* fileName) {
 	char* msg = (char*) malloc(strlen(fileName) + strlen(content));;
 	strcpy(msg, fileName);
 	sprintf(msg, "%s:%s", msg, content);
-	printf("encoded message: %s\n", msg);
 	return msg;
 }
 
 
-char** decodeFile(char* projectName, char* msg) {
+char** decodeFile(char* msg) {
 	
 	char* token;
 	token = strtok(msg, ":");
@@ -63,7 +62,5 @@ char** decodeFile(char* projectName, char* msg) {
 	decoded[1] = (char*) malloc(strlen(token) * sizeof(char));
 	decoded[1] = token;
 
-	printf("file name: %s\n", decoded[0]);
-	printf("file content: %s\n", decoded[1]);
 	return decoded;
 }

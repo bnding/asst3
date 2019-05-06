@@ -41,6 +41,11 @@ pthread_mutex_t mLock2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mLock3 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mLock4 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mLock5 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock6 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock7 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock8 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock9 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mLock10 = PTHREAD_MUTEX_INITIALIZER;
 
 
 //takes in the name of the folder its looking for
@@ -60,7 +65,7 @@ void create(char* projectName){
 	pthread_mutex_lock(&mLock2);
 	mkdir(".server_repo", 0700);
 
-	//makes the file in ServerRepo 
+	//makes the file in ServerRepo
 	char filePath[BUFF];
 
 	sprintf(filePath, ".server_repo/%s", projectName);
@@ -71,6 +76,12 @@ void create(char* projectName){
 		sprintf(filePath, "%s/.Manifest", filePath);
 		FILE *fd = fopen(filePath, "w");
 		fprintf(fd, "1\n");
+		fclose(fd);
+
+		char historyFile[BUFF];
+		sprintf(historyFile, ".server_repo/%s/.history", projectName, strlen(projectName));
+		fd = fopen(historyFile, "w");
+		fprintf(fd, "create\n0\n\n");
 		fclose(fd);
 
 		char* msg = encodeFile(filePath, "/.Manifest");
@@ -92,6 +103,7 @@ int isFile(const char* path) {
 void checkout(char* projectName, gzFile outFile, int childfd) {
 	char path[BUFF];
 	sprintf(path, ".server_repo/%s", projectName);
+	pthread_mutex_lock(&mLock3);
 	if (folderExist(path)) {
 		sendMsg("exists", childfd);
 		DIR *dir = opendir(path);
@@ -144,7 +156,7 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 						totalRead += x;
 						sprintf(buffer, "%s", buffer);
 						gzwrite(outFile, buffer, x);
-					}	       
+					}
 					fseek(fp, 0L, SEEK_END);
 					size = ftell(fp);
 					fclose(fp);
@@ -159,6 +171,7 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 		sendMsg("no path", childfd);
 		exit(0);
 	}
+	pthread_mutex_unlock(&mLock3);
 }
 
 void commit(char* projectName, int childfd) {
@@ -178,6 +191,7 @@ void commit(char* projectName, int childfd) {
 }
 
 void currentVersion(char* projectName, int childfd) {
+	pthread_mutex_lock(&mLock4);
 	char projectPath[BUFF];
 	bzero(projectPath, BUFF);
 	sprintf(projectPath, ".server_repo/%s", projectName);
@@ -199,16 +213,155 @@ void currentVersion(char* projectName, int childfd) {
 		sendMsg("no path", childfd);
 		exit(0);
 	}
+	pthread_mutex_unlock(&mLock4);
 }
 
 
-void destroy(char* projectName, int childfd) {
+void destroy(char* projectName) {
+	pthread_mutex_lock(&mLock5);
 	printf("destroy\n");
 	char projectPath[BUFF];
 	bzero(projectPath, BUFF);
 	sprintf(projectPath, ".server_repo/%s", projectName);
+	printf("%s\n", projectPath);
+
+	if(folderExist(projectPath)) {
+		sendMsg("folder exists", childfd);
+		char rmBuff[BUFF];
+		sprintf(rmBuff, "rm -rf %s", projectPath, strlen(projectPath));
+		printf("%s\n", rmBuff);
+		system(rmBuff);
+	} else {
+		sendMsg("no path", childfd);
+		exit(0);
+	}
+
+	pthread_mutex_unlock(&mLock5);
 
 
+}
+
+//returns the number of lines in a file
+int getLines(char* fileName){
+	int i = 0;
+	FILE *fp;
+
+	fp = fopen(fileName, "r");
+
+	if(fp == NULL){
+		fprintf(stderr, "Error. Cannot find file(s)\n");
+	}
+
+	char c = getc(fp);
+
+	while((c = getc(fp)) != EOF){
+		if(c == '\n'){
+			++i;
+		}
+	}
+
+	fclose(fp);
+	return i;
+
+}
+
+void update(char* projectName, int childfd){
+
+	pthread_mutex_lock(&mLock8);
+
+	//get the project path
+	char* projectPath = (char*)malloc(strlen(projectName)+ strlen(".server_repo/"));
+	memcpy(projectPath, ".server_repo/", strlen(".server_repo/"));
+	strcat(projectPath, projectName);
+
+	//checks if the folder exists
+	DIR *de;
+	if ((de = opendir(projectPath)) == NULL){
+		sendMsg("not found", childfd);
+	} else {
+		sendMsg("found", childfd);
+	}
+
+	//get the server manifest path
+	char* manifestPath = (char*)malloc(strlen(projectPath)+ strlen("/.Manifest"));
+	memcpy(manifestPath, projectPath, strlen(projectPath));
+	strcat(manifestPath, "/.Manifest");
+
+	//gets the encoded message and sends it to the client
+	char* msg = encodeFile(manifestPath, ".Manifest");
+	sendMsg(msg, childfd);
+
+	//send file size
+	int sLines = getLines(manifestPath);
+	char snum[BUFF];
+	snprintf(snum, sizeof(snum), "%d", sLines);
+	sendMsg(snum, childfd);
+	pthread_mutex_unlock(&mLock8);
+
+	return;
+	exit(0);
+
+}
+
+
+void history(char* projectName) {
+	pthread_mutex_lock(&mLock6);
+	char path[BUFF];
+	sprintf(path, ".server_repo/%s", projectName);
+
+	if(folderExist(path)) {
+		sendMsg("folder exists", childfd);
+		sprintf(path, "%s/.history", path, strlen(path), strlen("/.history"));
+
+		FILE* fp = fopen(path, "r");
+		char buffer[BUFF];
+		int x;
+
+		while((x = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+			sprintf(buffer, "%s", buffer);
+		}
+
+		sendMsg(buffer, childfd);
+	} else {
+		sendMsg("no path", childfd);
+		exit(0);
+	}
+	pthread_mutex_unlock(&mLock6);
+}
+
+void upgrade(char* projectName) {
+	pthread_mutex_lock(&mLock7);
+
+	char path[BUFF];
+	sprintf(path, ".server_repo/%s", projectName);
+
+	if(folderExist(path)) {
+		sendMsg("folder exists", childfd);
+		
+	} else {
+		sendMsg("no path", childfd);
+		exit(0);
+	}
+
+	int count = 0;
+	char msg[BUFF];
+	while(1) {
+		bzero(msg, BUFF);
+		recMsg(msg, childfd);
+		if(strcmp("NickAndVancha'sUniqueKeyThatShouldn'tBeAFileToTerminateAndFinish", msg) == 0) {
+			break;
+		} else {
+			char filePath[BUFF];
+			sprintf(filePath, ".server_repo/%s", msg, strlen(msg));
+
+			char* fileName = filePath;
+			fileName += strlen(".server_repo/");
+
+			char* encode = encodeFile(filePath, fileName);
+			sendMsg(encode, childfd);
+		}
+	}
+	pthread_mutex_unlock(&mLock7);
 }
 
 
@@ -217,9 +370,7 @@ void destroy(char* projectName, int childfd) {
 void* getCommand() {
 	pthread_mutex_lock(&mLock1);
 	char command[BUFF];
-	bzero(command, BUFF);
 	recMsg(command, childfd);
-	printf("command: %s\n", command);
 	if(strcmp("create", command) == 0) {
 		char projectName[BUFF];
 		recMsg(projectName, childfd);
@@ -253,8 +404,22 @@ void* getCommand() {
 	} else if (strcmp("destroy", command) == 0) {
 		char projectName[BUFF];
 		recMsg(projectName, childfd);
-		destroy(projectName, childfd);
+		destroy(projectName);
+	} else if(strcmp("update", command) == 0){
+		char projectName[BUFF];
+		recMsg(projectName, childfd);
+
+		update(projectName, childfd);
+	} else if(strcmp("history", command) == 0) {
+		char projectName[BUFF];
+		recMsg(projectName, childfd);
+		history(projectName);
+	} else if(strcmp("upgrade", command) == 0) {
+		char projectName[BUFF];
+		recMsg(projectName, childfd);
+		upgrade(projectName);
 	}
+
 	pthread_mutex_unlock(&mLock1);
 }
 
