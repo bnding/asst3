@@ -26,6 +26,7 @@ list* head;
 int run = 1;
 void signalHandler() {
 	run = 0;
+	pthread_exit(0);
 }
 
 int childfd;
@@ -339,7 +340,7 @@ void upgrade(char* projectName) {
 
 	if(folderExist(path)) {
 		sendMsg("folder exists", childfd);
-		
+
 	} else {
 		sendMsg("no path", childfd);
 		//exit(0);
@@ -366,6 +367,96 @@ void upgrade(char* projectName) {
 	pthread_mutex_unlock(&mLock7);
 }
 
+int wordCount(char* sentence){
+	int count = 0;
+	int flag = 0;
+	int i;
+	for(i = 0; i < strlen(sentence); i++){
+		if(flag == 0 && !isspace(sentence[i])){
+			count++;
+			flag = 1;
+		} else if (isspace(sentence[i])){
+			flag = 0;
+		}
+	}
+	return count;
+}
+
+char** makeArr(char* sentence, int numWords, char* delimiter){
+	char** arr2 = (char**) malloc(numWords * sizeof(char*));
+	char* word = strtok(sentence, delimiter);
+	int count = 0;
+
+	while(word != NULL){
+		arr2[count] = word;
+		word = strtok(NULL, delimiter);
+		count++;
+	}
+	return arr2;
+}
+
+void checkoutClient(char* projectName) {
+	if(folderExist(projectName) != 0) {
+		fprintf(stderr, "Error. Project already exists at the client! Exiting...\n");
+		exit(0);
+	}
+
+	sendMsg("checkout", childfd);
+	sendMsg(projectName, childfd);
+
+	char msg[BUFF];
+	recMsg(msg, childfd);
+	recMsg(msg, childfd);
+
+
+	if(strcmp("exists", msg) == 0) {
+		printf("Project exists at server. Continuing...\n");
+
+		char compMsg[BUFF];
+		recMsg(compMsg, childfd);
+
+		char* compStr = compMsg;
+		int count = wordCount(compStr);
+		char** arr = makeArr(compStr, count, "\n");
+
+		mkdir(projectName, 0700);
+		printf("Decompressing and extracting the following files and directories to %s in client...\n\n", projectName);
+
+		int i;
+		char* currFile;
+		FILE* fd;
+		for(i = 0; arr[i+1] != NULL; i++) {
+			count = wordCount(arr[i]);
+			char* currLine = (char*) malloc(strlen(arr[i]) * sizeof(char));
+			currLine = arr[i];
+			if(strstr(currLine, ".server_repo/") != NULL) {
+				currLine += strlen(".server_repo/");
+			}
+			char buffer[BUFF];
+			bzero(buffer, BUFF);
+			sprintf(buffer, arr[i], strlen(arr[i]));
+			char** currArr = makeArr(arr[i], count, " \t");
+
+			if(count == 3 && strcmp(currArr[1], "R") == 0) {
+				printf("Making file: %s\n", currLine);
+				currFile = currLine;
+				fd = fopen(currFile, "w");
+			} else if (count == 3 && strcmp(currArr[1], "D") == 0){
+				printf("Making directory: %s\n", currLine);
+				mkdir(currLine, 0700);
+			} else {
+				fprintf(fd, "%s\n", buffer);
+			}
+		}
+		fclose(fd);
+		printf("Success! Compressed files unzipped and brought to client. Removing compressed file at server...\n");
+		exit(0);
+	} else if(strcmp("no path", msg) == 0) {
+		fprintf(stderr, "Project does not exist in server! Exiting...\n");
+		exit(0);
+	}
+}
+
 
 void push(char* projectName) {
 	pthread_mutex_lock(&mLock9);
@@ -375,9 +466,38 @@ void push(char* projectName) {
 
 	if(folderExist(path)) {
 		sendMsg("folder exists", childfd);
+		char clientCom[BUFF];
+		bzero(clientCom, BUFF);
+		recMsg(clientCom, childfd);
+
+		char commitPath[BUFF];
+		bzero(commitPath, BUFF);
+		sprintf(commitPath, ".server_repo/%s%s", projectName, ".Commit", strlen(projectName), strlen(".Commit"));
+
+
+		FILE* fp = fopen(commitPath, "r");
+		int x = 0;
 		char serverCom[BUFF];
 		bzero(serverCom, BUFF);
-		//sprintf(serverCom, "%s%s");
+		while((x = fread(serverCom, 1, sizeof(serverCom), fp)) > 0) {
+			sprintf(serverCom, "%s", serverCom);
+		}
+		fclose(fp);
+
+
+		if (strcmp(serverCom, clientCom) == 0) {
+			sendMsg("success", childfd);
+
+			char rmBuff[BUFF];
+			sprintf(rmBuff, "rm -rf %s", path, strlen(path));
+			printf("%s\n", rmBuff);
+			system(rmBuff);		
+			checkoutClient(path);
+			return;
+		} else {
+			sendMsg("fail", childfd);
+			return;
+		}
 
 	} else {
 		sendMsg("no path", childfd);
@@ -406,6 +526,7 @@ void* getCommand() {
 	} else if(strcmp("checkout", command) == 0) {
 		char projectName[BUFF];
 		char gzLoc[BUFF];
+		bzero(gzLoc, BUFF);
 
 		recMsg(projectName, childfd);
 		sprintf(gzLoc, ".server_repo/%s/zippedFile.gz", projectName);
@@ -475,7 +596,7 @@ void* createServer(int port) {
 
 	if(port < 8000 || port > 64000) {
 		fprintf(stderr, "Error. Server port is not within range!\n");
-		//exit(0);
+		exit(0);
 	}
 
 	serverAddr.sin_family = AF_INET;
@@ -484,27 +605,20 @@ void* createServer(int port) {
 
 	if((bind(sockfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr))) != 0) {
 		fprintf(stderr, "Error. socket bind failed.\n");
-		//exit(0);
+		exit(0);
 	} else {
 		printf("Socket successfully binded!\n");
 	}
 
 
-	
+
 	if ((listen(sockfd, 5)) != 0) {
 		fprintf(stderr, "Error. Listen failed.\n");
-		//exit(0);
+		exit(0);
 	} else {
 		printf("Server listening...\n");
 	}
 	len = sizeof(client);
-
-
-
-
-	
-
-
 
 	list* temp = (list*) malloc(sizeof(struct list));
 	head = temp;
@@ -550,7 +664,7 @@ int main(int argc, char** argv) {
 	int server = socket(AF_INET, SOCK_STREAM, 0);
 	if(server < 0) {
 		fprintf(stderr, "Error creating server!\n");
-		//exit(0);
+		exit(0);
 	} else {
 		printf("Server creation is successful!\n");
 	}
@@ -570,11 +684,7 @@ int main(int argc, char** argv) {
 	t1 = t1->next;
 	free(oldThread);
 
-	//getCommand(childfd);
-
-
 	close(childfd);
-	//exit(0);
 
 
 	return 0;

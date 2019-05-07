@@ -30,13 +30,13 @@ void recMsg(char msg[BUFF], int sockfd) {
 	int buflen;
 	int n = read(sockfd, (char*)&buflen, sizeof(buflen));
 	if (n < 0){
-		fprintf(stderr, "Error. Cannot read from socket");
+		fprintf(stderr, "Error. Cannot read from socket1");
 		exit(0);
 	}
 	buflen = ntohl(buflen);
 	n = read(sockfd, msg, buflen);
 	if (n < 0){
-		fprintf(stderr, "Error. Cannot read from socket");
+		fprintf(stderr, "Error. Cannot read from socket2");
 		exit(0);
 	}
 

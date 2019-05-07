@@ -48,14 +48,18 @@ char** readConfig() {
 	//tokenize string to array
 	char* token;
 	token = strtok(configStr, " ");
+	printf("token: %s\n", token);
 	char** config2d = (char**) malloc(2 * sizeof(char*));
 
 	config2d[0] = (char*) malloc(strlen(token) * sizeof(char));
 	config2d[0] = token;
 
 	token = strtok(NULL, " ");
+	printf("token: %s\n", token);
 	config2d[1] = (char*) malloc(strlen(token) * sizeof(char));
 	config2d[1] = token;
+
+	printf("config2d[1]: %s\n", config2d[1]);
 
 	return config2d;
 }
@@ -557,6 +561,7 @@ void configure(char* ip, char* port) {
 	}
 	int fd;
 
+	remove(".configure");
 	fd = open(".configure", O_CREAT | O_RDWR, 0644);
 	write(fd, ip, strlen(ip));
 	write(fd, " ", 1);
@@ -1031,6 +1036,79 @@ void upgrade(char* projectName) {
 	remove(updateBuff);
 }
 
+void checkoutServer(char* projectName, gzFile outFile, int childfd) {
+	char path[BUFF];
+	bzero(path, BUFF);
+	sprintf(path, ".server_repo/%s", projectName);
+	if (folderExist(path)) {
+		sendMsg("exists", childfd);
+		DIR *dir = opendir(path);
+		struct dirent* entry;
+
+		if(!(dir = opendir(path))) {
+			return;
+		}
+
+		FILE *fp;
+		char ch;
+		int size = 0;
+
+		unsigned long totalRead = 0;
+		unsigned long totalWrite = 0;
+
+		while ((entry = readdir(dir)) != NULL) {
+
+			if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && strcmp(entry->d_name, "zippedFile.gz") != 0){
+				int x = 0;
+				char buffer[BUFF];
+				char fileLen[BUFF];
+				char filePath[BUFF];
+				sprintf(filePath, "%s/%s", path, entry->d_name);
+				gzwrite(outFile, filePath, strlen(filePath));
+
+				if (entry->d_type == DT_DIR) {
+					//directory
+					char path[1024];
+					snprintf(path, sizeof(path), "%s/%s", projectName, entry->d_name);
+					gzwrite(outFile, " D -1\n", strlen(" D -1\n"));
+					checkoutServer(path, outFile, childfd);
+				} else {
+					//files
+					gzwrite(outFile, " R ", strlen(" R "));
+					fp = fopen(filePath, "rb");
+					while((x = fread(fileLen, 1, sizeof(fileLen), fp)) > 0) {
+					}
+					fseek(fp, 0L, SEEK_END);
+					size = ftell(fp);
+					char numStr[BUFF];
+					snprintf(numStr, sizeof(numStr), "%d", size);
+					gzwrite(outFile, numStr, strlen(numStr));
+					fclose(fp);
+
+					x = 0;
+					fp = fopen(filePath, "rb");
+					gzwrite(outFile, "\n", strlen("\n"));
+					while((x = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+						totalRead += x;
+						sprintf(buffer, "%s", buffer);
+						gzwrite(outFile, buffer, x);
+					}
+					fseek(fp, 0L, SEEK_END);
+					size = ftell(fp);
+					fclose(fp);
+				}
+			}
+		}
+
+
+
+		closedir(dir);
+	} else {
+		sendMsg("no path", childfd);
+		//exit(0);
+	}
+}
+
 
 void push(char* projectName) {
 	char updateBuff[BUFF];
@@ -1066,7 +1144,7 @@ void push(char* projectName) {
 			}
 		} 
 	}
-	
+
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
@@ -1080,7 +1158,7 @@ void push(char* projectName) {
 		char commitPath[BUFF];
 		bzero(commitPath, BUFF);
 
-		
+
 		sprintf(commitPath, "%s%s", projectName, ".Commit", strlen(projectName), strlen(".Commit"));
 		char* encodedCom = encodeFile(commitPath, ".Commit");
 
@@ -1094,7 +1172,40 @@ void push(char* projectName) {
 		}
 		fclose(fp);
 
-		printf("commitContent\n===============================\n%s\n", commitContent);
+		sendMsg(commitContent, sockfd);
+
+		bzero(msg, BUFF);
+		recMsg(msg, sockfd);
+
+		if(strcmp("success", msg) == 0) {
+			printf("success!\n");
+		} else {
+			fprintf(stderr,"Error. Push failed.\n");
+			exit(0);
+		}
+
+		char gzLoc[BUFF];
+		bzero(gzLoc, BUFF);
+		recMsg(projectName, sockfd);
+		sprintf(gzLoc, "%s/zippedFile.gz", projectName);
+		gzFile outFile = gzopen(gzLoc, "wb");
+		checkoutServer(projectName, outFile, sockfd);
+		gzclose(outFile);
+		
+		char msg[BUFF];
+		gzFile f = gzopen(gzLoc, "r");
+		sendCompress(gzLoc, sockfd);
+		write(sockfd, f, BUFF);
+		remove(gzLoc);
+		checkoutServer(projectName, outFile, sockfd); 
+		gzclose(f);
+
+		
+
+
+
+
+
 
 
 
