@@ -1,4 +1,0 @@
-D	1	blah/subDir/NotInServer.txt	c187a9be80b63a5bbc57eb43c88cba536eb4dbd0ec32aeaea9e6d66b566f7be4
-M	2	blah/subDir/subdirfile.txt	62eeaf04ca77bec28cb955ba67d20edc190b61101733195271e4b694d8ee70a9
-D	1	blah/notOnServer.txt	96fcd811673d994f16f98970fa334e6f852b5e5bcd88de88474fe6745f8f6247
-A	1	blah/subDir/NotInClient.txt	08874080c83f3c3d33bd1e401896f36eaeab12297e9963abc70266b389bb6a2c	

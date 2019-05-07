@@ -59,8 +59,6 @@ char** readConfig() {
 	config2d[1] = (char*) malloc(strlen(token) * sizeof(char));
 	config2d[1] = token;
 
-	printf("config2d[1]: %s\n", config2d[1]);
-
 	return config2d;
 }
 
@@ -542,15 +540,18 @@ int connectServer(char* ip, int port) {
 
 
 
-	if(connect(sock, (struct sockaddr*) &serverAddr, sizeof(serverAddr)) < 0) {
-		fprintf(stderr, "Error. Connection to server failed.\n");
-		exit(0);
-	} else {
-		printf("Successfully connected to server!\n");
+	while(1) {
+		printf("Attempting to connect...\n");
+		if(connect(sock, (struct sockaddr*) &serverAddr, sizeof(serverAddr)) < 0) {
+			fprintf(stderr, "Error. Connection to server failed.\n");
+		} else {
+			printf("Successfully connected to server!\n");
+			return sock;
+		}
+		sleep(3);	
 	}
 
 
-	return sock;
 }
 
 void configure(char* ip, char* port) {
@@ -577,13 +578,17 @@ void create(char* projectName) {
 	char** config = readConfig();
 	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
 
+	printf("returned socket.\n");
+	printf("SOCKFD: %d\n\n", sockfd);
 	sendMsg("create", sockfd);
+	printf("create message sent.\n");
 	sendMsg(projectName, sockfd);
+	printf("project name message sent.\n");
 
 	char file[BUFF];
 	bzero(file, BUFF);
-	printf("SOCKFD: %d\n\n", sockfd);
 	recMsg(file, sockfd);
+	printf("received message\n");
 
 	printf("status: %s\n\n", file);
 
@@ -861,7 +866,7 @@ void upgrade(char* projectName) {
 	char updateBuff[BUFF];
 	if(strcmp("folder exists", msg) == 0) {
 		printf("Folder exists at server! Continuing...\n\n");
-		sprintf(updateBuff, "%s%s", projectName, ".Update", strlen(projectName), strlen(".Update"));
+		sprintf(updateBuff, "%s%s", projectName, "/.Update", strlen(projectName), strlen("/.Update"));
 		printf("Update: %s\n\n", updateBuff);
 
 		if(access(updateBuff, F_OK) != -1) {
@@ -890,7 +895,7 @@ void upgrade(char* projectName) {
 
 	char manPath[BUFF];
 	bzero(manPath, BUFF);
-	sprintf(manPath, "%s.Manifest", projectName);
+	sprintf(manPath, "%s/.Manifest", projectName);
 
 	FILE* manfd = fopen(manPath, "r");
 	int x = 0;
@@ -1036,79 +1041,6 @@ void upgrade(char* projectName) {
 	remove(updateBuff);
 }
 
-void checkoutServer(char* projectName, gzFile outFile, int childfd) {
-	char path[BUFF];
-	bzero(path, BUFF);
-	sprintf(path, ".server_repo/%s", projectName);
-	if (folderExist(path)) {
-		sendMsg("exists", childfd);
-		DIR *dir = opendir(path);
-		struct dirent* entry;
-
-		if(!(dir = opendir(path))) {
-			return;
-		}
-
-		FILE *fp;
-		char ch;
-		int size = 0;
-
-		unsigned long totalRead = 0;
-		unsigned long totalWrite = 0;
-
-		while ((entry = readdir(dir)) != NULL) {
-
-			if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && strcmp(entry->d_name, "zippedFile.gz") != 0){
-				int x = 0;
-				char buffer[BUFF];
-				char fileLen[BUFF];
-				char filePath[BUFF];
-				sprintf(filePath, "%s/%s", path, entry->d_name);
-				gzwrite(outFile, filePath, strlen(filePath));
-
-				if (entry->d_type == DT_DIR) {
-					//directory
-					char path[1024];
-					snprintf(path, sizeof(path), "%s/%s", projectName, entry->d_name);
-					gzwrite(outFile, " D -1\n", strlen(" D -1\n"));
-					checkoutServer(path, outFile, childfd);
-				} else {
-					//files
-					gzwrite(outFile, " R ", strlen(" R "));
-					fp = fopen(filePath, "rb");
-					while((x = fread(fileLen, 1, sizeof(fileLen), fp)) > 0) {
-					}
-					fseek(fp, 0L, SEEK_END);
-					size = ftell(fp);
-					char numStr[BUFF];
-					snprintf(numStr, sizeof(numStr), "%d", size);
-					gzwrite(outFile, numStr, strlen(numStr));
-					fclose(fp);
-
-					x = 0;
-					fp = fopen(filePath, "rb");
-					gzwrite(outFile, "\n", strlen("\n"));
-					while((x = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
-						totalRead += x;
-						sprintf(buffer, "%s", buffer);
-						gzwrite(outFile, buffer, x);
-					}
-					fseek(fp, 0L, SEEK_END);
-					size = ftell(fp);
-					fclose(fp);
-				}
-			}
-		}
-
-
-
-		closedir(dir);
-	} else {
-		sendMsg("no path", childfd);
-		//exit(0);
-	}
-}
-
 
 void push(char* projectName) {
 	char updateBuff[BUFF];
@@ -1159,13 +1091,15 @@ void push(char* projectName) {
 		bzero(commitPath, BUFF);
 
 
-		sprintf(commitPath, "%s%s", projectName, ".Commit", strlen(projectName), strlen(".Commit"));
+		printf("TEST\n");
+		sprintf(commitPath, "%s%s", projectName, "/.Commit", strlen(projectName), strlen("/.Commit"));
 		char* encodedCom = encodeFile(commitPath, ".Commit");
 
 		FILE* fp = fopen(commitPath, "r");
 		int x = 0;
 		char commitContent[BUFF];
 		bzero(commitContent, BUFF);
+
 
 		while((x = fread(commitContent, 1, sizeof(commitContent), fp)) > 0) {
 			sprintf(commitContent, "%s", commitContent);
@@ -1184,26 +1118,8 @@ void push(char* projectName) {
 			exit(0);
 		}
 
-		char gzLoc[BUFF];
-		bzero(gzLoc, BUFF);
-		recMsg(projectName, sockfd);
-		sprintf(gzLoc, "%s/zippedFile.gz", projectName);
-		gzFile outFile = gzopen(gzLoc, "wb");
-		checkoutServer(projectName, outFile, sockfd);
-		gzclose(outFile);
-		
-		char msg[BUFF];
-		gzFile f = gzopen(gzLoc, "r");
-		sendCompress(gzLoc, sockfd);
-		write(sockfd, f, BUFF);
-		remove(gzLoc);
-		checkoutServer(projectName, outFile, sockfd); 
-		gzclose(f);
 
-		
-
-
-
+		//TODO start here.
 
 
 
@@ -1213,6 +1129,45 @@ void push(char* projectName) {
 		fprintf(stderr, "Error. Project does not exist at server.\nTerminating...\n");
 		exit(0);
 	}
+
+}
+
+
+void rollback(char* projectName, char* ver) {
+	char** config = readConfig();
+	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
+
+
+	sendMsg("rollback", sockfd);
+	sendMsg(projectName, sockfd);
+	char msg[BUFF];
+	bzero(msg, BUFF);
+	recMsg(msg, sockfd);
+
+	if(strcmp("folder exists", msg) == 0) {
+		printf("Folder exists at server! Continuing...\n\n");
+		sendMsg(ver, sockfd);
+
+		char res[BUFF];
+		bzero(res, BUFF);
+
+		recMsg(res, sockfd);
+
+		if(strcmp(res, "success") == 0) {
+			printf("Successful roll back!\n");
+		} else {
+			fprintf(stderr, "Error. Invalid rollback version.\n");
+		}
+
+
+
+	} else {
+		fprintf(stderr, "Error. Project does not exist at server.\nTerminating...\n");
+		exit(0);
+	}
+
+
+
 
 }
 
@@ -1297,6 +1252,13 @@ int main(int argc, char** argv) {
 		} else {
 			fprintf(stderr, "Error. Configurations not set! no Valid IP and port.\n");
 		}
-		return 0;
+	} else if (strcmp("rollback", argv[1]) == 0) {
+		if(access(".configure", F_OK) != -1 && argc == 4) {
+			rollback(argv[2], argv[3]);
+		} else {
+			fprintf(stderr, "Error. Invalid number of inputs or configurations not set. no Valid IP and port.\n");
+		}
 	}
+
+	return 0;
 }

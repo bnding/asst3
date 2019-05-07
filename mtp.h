@@ -27,6 +27,7 @@ void sendMsg(char* msg, int sockfd) {
 }
 
 void recMsg(char msg[BUFF], int sockfd) {
+	bzero(msg, BUFF);
 	int buflen;
 	int n = read(sockfd, (char*)&buflen, sizeof(buflen));
 	if (n < 0){
@@ -46,6 +47,7 @@ void recMsg(char msg[BUFF], int sockfd) {
 void sendCompress(char* filePath, int sockfd) {
 	gzFile fd = gzopen(filePath, "rb");
 	char buffer[BUFF];
+	bzero(buffer, BUFF);
 	while(gzread(fd, buffer, BUFF) > 0) {
 	       sprintf(buffer, "%s", buffer);
 	}	       

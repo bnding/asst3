@@ -1,0 +1,22 @@
+create
+0 
+
+push
+1
+A	1	covfefe/readme.md mf9asc9sda8jcsa97
+
+push
+2
+M	2	covfefe/readme.md jc8adc98a8e9jc9
+A	1	covfefe/my_code.py 8fjsad98jc9a8808
+
+push
+3
+A	1	covfefe/bigly.txt ausdfh9uahsdc9f4
+A	1	covfefe/data/memes.csv ca0894ja98jc849aj
+
+push
+4 
+D	1	covfefe/data/memes.csv 0c8aj498c9a98j9coi
+M	2	covfefe/my_code.py cu9a984ac09932kc
+M	2	covfefe/images/tweet.png c0ij4208cawkjdkff

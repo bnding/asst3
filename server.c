@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <semaphore.h>
+#include <ctype.h>
 #include "ftp.h"
 #include "mtp.h"
 #include "zlib.h"
@@ -64,7 +65,6 @@ int folderExist(char* lookingFor){
 }
 
 void create(char* projectName){
-	pthread_mutex_lock(&mLock2);
 	mkdir(".server_repo", 0700);
 
 	//makes the file in ServerRepo
@@ -77,6 +77,7 @@ void create(char* projectName){
 	if(mkdir(filePath, 0700) == 0){
 
 		sprintf(filePath, "%s/.Manifest", filePath);
+		pthread_mutex_lock(&mLock2);
 		FILE *fd = fopen(filePath, "w");
 		fprintf(fd, "0\n");
 		fclose(fd);
@@ -87,14 +88,15 @@ void create(char* projectName){
 		fd = fopen(historyFile, "w");
 		fprintf(fd, "create\n0\n\n");
 		fclose(fd);
+		pthread_mutex_unlock(&mLock2);
 
 		char* msg = encodeFile(filePath, "/.Manifest");
 		sendMsg(msg, childfd);
+		printf("message send\n");
 
 	} else {
 		//exit(0);
 	}
-	pthread_mutex_unlock(&mLock2);
 }
 
 int isFile(const char* path) {
@@ -130,8 +132,11 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 			if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && strcmp(entry->d_name, "zippedFile.gz") != 0){
 				int x = 0;
 				char buffer[BUFF];
+				bzero(buffer, BUFF);
 				char fileLen[BUFF];
+				bzero(fileLen, BUFF);
 				char filePath[BUFF];
+				bzero(filePath, BUFF);
 				sprintf(filePath, "%s/%s", path, entry->d_name);
 				gzwrite(outFile, filePath, strlen(filePath));
 
@@ -150,6 +155,7 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 					fseek(fp, 0L, SEEK_END);
 					size = ftell(fp);
 					char numStr[BUFF];
+					bzero(numStr, BUFF);
 					snprintf(numStr, sizeof(numStr), "%d", size);
 					gzwrite(outFile, numStr, strlen(numStr));
 					fclose(fp);
@@ -207,6 +213,7 @@ void currentVersion(char* projectName, int childfd) {
 
 		FILE* fp = fopen(projectPath, "r");
 		char buffer[BUFF];
+		bzero(buffer, BUFF);
 		int x;
 
 		while((x = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
@@ -231,8 +238,8 @@ void destroy(char* projectName) {
 	if(folderExist(projectPath)) {
 		sendMsg("folder exists", childfd);
 		char rmBuff[BUFF];
+		bzero(rmBuff, BUFF);
 		sprintf(rmBuff, "rm -rf %s", projectPath, strlen(projectPath));
-		printf("%s\n", rmBuff);
 		system(rmBuff);
 	} else {
 		sendMsg("no path", childfd);
@@ -297,6 +304,7 @@ void update(char* projectName, int childfd){
 	//send file size
 	int sLines = getLines(manifestPath);
 	char snum[BUFF];
+	bzero(snum, BUFF);
 	snprintf(snum, sizeof(snum), "%d", sLines);
 	sendMsg(snum, childfd);
 	pthread_mutex_unlock(&mLock8);
@@ -310,6 +318,7 @@ void update(char* projectName, int childfd){
 void history(char* projectName) {
 	pthread_mutex_lock(&mLock6);
 	char path[BUFF];
+	bzero(path, BUFF);
 	sprintf(path, ".server_repo/%s", projectName);
 
 	if(folderExist(path)) {
@@ -318,6 +327,7 @@ void history(char* projectName) {
 
 		FILE* fp = fopen(path, "r");
 		char buffer[BUFF];
+		bzero(buffer, BUFF);
 		int x;
 
 		while((x = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
@@ -336,6 +346,7 @@ void upgrade(char* projectName) {
 	pthread_mutex_lock(&mLock7);
 
 	char path[BUFF];
+	bzero(path, BUFF);
 	sprintf(path, ".server_repo/%s", projectName);
 
 	if(folderExist(path)) {
@@ -355,6 +366,7 @@ void upgrade(char* projectName) {
 			break;
 		} else {
 			char filePath[BUFF];
+			bzero(filePath, BUFF);
 			sprintf(filePath, ".server_repo/%s", msg, strlen(msg));
 
 			char* fileName = filePath;
@@ -395,69 +407,6 @@ char** makeArr(char* sentence, int numWords, char* delimiter){
 	return arr2;
 }
 
-void checkoutClient(char* projectName) {
-	if(folderExist(projectName) != 0) {
-		fprintf(stderr, "Error. Project already exists at the client! Exiting...\n");
-		exit(0);
-	}
-
-	sendMsg("checkout", childfd);
-	sendMsg(projectName, childfd);
-
-	char msg[BUFF];
-	recMsg(msg, childfd);
-	recMsg(msg, childfd);
-
-
-	if(strcmp("exists", msg) == 0) {
-		printf("Project exists at server. Continuing...\n");
-
-		char compMsg[BUFF];
-		recMsg(compMsg, childfd);
-
-		char* compStr = compMsg;
-		int count = wordCount(compStr);
-		char** arr = makeArr(compStr, count, "\n");
-
-		mkdir(projectName, 0700);
-		printf("Decompressing and extracting the following files and directories to %s in client...\n\n", projectName);
-
-		int i;
-		char* currFile;
-		FILE* fd;
-		for(i = 0; arr[i+1] != NULL; i++) {
-			count = wordCount(arr[i]);
-			char* currLine = (char*) malloc(strlen(arr[i]) * sizeof(char));
-			currLine = arr[i];
-			if(strstr(currLine, ".server_repo/") != NULL) {
-				currLine += strlen(".server_repo/");
-			}
-			char buffer[BUFF];
-			bzero(buffer, BUFF);
-			sprintf(buffer, arr[i], strlen(arr[i]));
-			char** currArr = makeArr(arr[i], count, " \t");
-
-			if(count == 3 && strcmp(currArr[1], "R") == 0) {
-				printf("Making file: %s\n", currLine);
-				currFile = currLine;
-				fd = fopen(currFile, "w");
-			} else if (count == 3 && strcmp(currArr[1], "D") == 0){
-				printf("Making directory: %s\n", currLine);
-				mkdir(currLine, 0700);
-			} else {
-				fprintf(fd, "%s\n", buffer);
-			}
-		}
-		fclose(fd);
-		printf("Success! Compressed files unzipped and brought to client. Removing compressed file at server...\n");
-		exit(0);
-	} else if(strcmp("no path", msg) == 0) {
-		fprintf(stderr, "Project does not exist in server! Exiting...\n");
-		exit(0);
-	}
-}
-
-
 void push(char* projectName) {
 	pthread_mutex_lock(&mLock9);
 	char path[BUFF];
@@ -472,7 +421,7 @@ void push(char* projectName) {
 
 		char commitPath[BUFF];
 		bzero(commitPath, BUFF);
-		sprintf(commitPath, ".server_repo/%s%s", projectName, ".Commit", strlen(projectName), strlen(".Commit"));
+		sprintf(commitPath, ".server_repo/%s/%s", projectName, "/.Commit", strlen(projectName), strlen("/.Commit"));
 
 
 		FILE* fp = fopen(commitPath, "r");
@@ -482,17 +431,18 @@ void push(char* projectName) {
 		while((x = fread(serverCom, 1, sizeof(serverCom), fp)) > 0) {
 			sprintf(serverCom, "%s", serverCom);
 		}
+		printf("server com: %s\n", serverCom);
 		fclose(fp);
 
 
 		if (strcmp(serverCom, clientCom) == 0) {
 			sendMsg("success", childfd);
+			printf("done\n");
 
-			char rmBuff[BUFF];
-			sprintf(rmBuff, "rm -rf %s", path, strlen(path));
-			printf("%s\n", rmBuff);
-			system(rmBuff);		
-			checkoutClient(path);
+			//char rmBuff[BUFF];
+			//sprintf(rmBuff, "rm -rf %s", path, strlen(path));
+			//printf("%s\n", rmBuff);
+			//system(rmBuff);		
 			return;
 		} else {
 			sendMsg("fail", childfd);
@@ -503,20 +453,137 @@ void push(char* projectName) {
 		sendMsg("no path", childfd);
 		//exit(0);
 	}
-
-
-
-
-
 	pthread_mutex_unlock(&mLock9);
+}
+
+int digits_only(const char *s)
+{
+	while (*s) {
+		if (isdigit(*s++) == 0) return 0;
+	}
+
+	return 1;
+}
+
+
+void rollback(char* projectName) {
+	pthread_mutex_lock(&mLock10);
+	char projectPath[BUFF];
+	bzero(projectPath, BUFF);
+	sprintf(projectPath, ".server_repo/%s", projectName);
+
+	if(folderExist(projectPath)) {
+		sendMsg("folder exists", childfd);
+		char ver[BUFF];
+		bzero(ver, BUFF);
+		recMsg(ver, childfd);
+
+		char histPath[BUFF];
+		bzero(histPath, BUFF);
+		sprintf(histPath, "%s%s", projectPath, "/.history");
+
+		FILE* fp = fopen(histPath, "r");
+		int x = 0;
+		char histContent[BUFF];
+		bzero(histContent, BUFF);
+
+		while((x = fread(histContent, 1, sizeof(histContent), fp)) > 0) {
+			sprintf(histContent, "%s", histContent);
+		}
+		fclose(fp);
+
+		//printf("HIST CONTENT\n=========================\n%s\n", histContent);
+
+		char** currLineArr;
+		char* curLine = histContent;
+		int flag = 0;
+		int iVer;
+		sscanf(ver, "%d", &iVer);
+
+		char rbMan[BUFF];
+		bzero(rbMan, BUFF);
+
+		int done = 0;
+		int onlyOnce = 0;
+		int currVer;
+
+		if(iVer == 0) {
+			sprintf(rbMan, "rollback 0\n0\n", strlen("rollback 0\n0\n"));
+		} else {
+			sprintf(rbMan, "%s%s%d\n", rbMan, "rollback ", iVer, strlen(rbMan), strlen("rollback "));
+			while(curLine) {
+				char * nextLine = strchr(curLine, '\n');
+				if (nextLine) *nextLine = '\0';  // temporarily terminate the current line
+				int count = wordCount(curLine);
+				currLineArr = makeArr(curLine, count, "\t");
+
+				if(count == 1 && digits_only(currLineArr[0]) == 1) {
+					sscanf(currLineArr[0], "%d", &currVer);
+					if(iVer == currVer) { 
+						flag = 1;
+					} else {
+						flag = 0;
+					}
+				} else if (count == 1 && digits_only(currLineArr[0]) != 1){
+					flag = 0;
+				}
+
+				if (flag == 1){
+					if(count == 1 && digits_only(currLineArr[0]) == 1) {
+						sprintf(rbMan, "%s%s\n", rbMan, currLineArr[0], strlen(rbMan),strlen(currLineArr[0]));
+					} else if (count == 4) {
+						sprintf(rbMan, "%s%s\t%s\t%s\n", rbMan, currLineArr[0], currLineArr[1], currLineArr[2], strlen(rbMan), strlen(currLineArr[0]), strlen(currLineArr[1]), strlen(currLineArr[2]));
+					}
+				}
+				if (nextLine) *nextLine = '\n';
+				curLine = nextLine ? (nextLine+1) : NULL;
+			}
+		}
+
+		if(strlen(rbMan) > 0) {
+			char manPath[BUFF];
+			bzero(manPath, BUFF);
+			sprintf(manPath, "%s%s",projectPath, "/.Manifest"); 
+			remove(manPath);
+
+			char rb[BUFF];
+			bzero(rb, BUFF);
+			sprintf(rb, "%s%d\n", "rollback ", iVer, strlen("rollback "));
+			char* ptr = &rbMan[strlen(rb)];
+			fp = fopen(manPath, "w");
+			fprintf(fp, "%s", ptr);
+			fclose(fp);
+
+			FILE* pFile2 = fopen(histPath, "a");
+			fprintf(pFile2, "\n%s", rbMan);
+			fclose(pFile2);
+
+			sendMsg("success", childfd);
+		} else {
+			sendMsg("invalid version", childfd);
+		}
+
+
+
+	} else {
+		sendMsg("no path", childfd);
+	}
+
+
+
+
+
+
+	pthread_mutex_unlock(&mLock10);
 }
 
 
 
 
 void* getCommand() {
-	pthread_mutex_lock(&mLock1);
+	//pthread_mutex_lock(&mLock1);
 	char command[BUFF];
+	bzero(command, BUFF);
 	recMsg(command, childfd);
 	if(strcmp("create", command) == 0) {
 		char projectName[BUFF];
@@ -525,6 +592,7 @@ void* getCommand() {
 		create(projectName);
 	} else if(strcmp("checkout", command) == 0) {
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		char gzLoc[BUFF];
 		bzero(gzLoc, BUFF);
 
@@ -536,6 +604,7 @@ void* getCommand() {
 		gzclose(outFile);
 
 		char msg[BUFF];
+		bzero(msg, BUFF);
 		gzFile f = gzopen(gzLoc, "r");
 		sendCompress(gzLoc, childfd);
 		write(childfd, f, BUFF);
@@ -543,36 +612,50 @@ void* getCommand() {
 		gzclose(f);
 	} else if (strcmp("commit", command) == 0) {
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		recMsg(projectName, childfd);
 		commit(projectName, childfd);
 	} else if (strcmp("currentversion", command) == 0) {
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		recMsg(projectName, childfd);
 		currentVersion(projectName, childfd);
 	} else if (strcmp("destroy", command) == 0) {
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		recMsg(projectName, childfd);
 		destroy(projectName);
 	} else if(strcmp("update", command) == 0){
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		recMsg(projectName, childfd);
 
 		update(projectName, childfd);
 	} else if(strcmp("history", command) == 0) {
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		recMsg(projectName, childfd);
 		history(projectName);
 	} else if(strcmp("upgrade", command) == 0) {
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		recMsg(projectName, childfd);
 		upgrade(projectName);
 	} else if(strcmp("push", command) == 0) {
 		char projectName[BUFF];
+		bzero(projectName, BUFF);
 		recMsg(projectName, childfd);
 		push(projectName);
+	} else if(strcmp("rollback", command) == 0) {
+		char projectName[BUFF];
+		bzero(projectName, BUFF);
+		recMsg(projectName, childfd);
+		rollback(projectName);
+	} else {
+		printf("invalid command: %s\n", command);
 	}
 
-	pthread_mutex_unlock(&mLock1);
+	//pthread_mutex_unlock(&mLock1);
 }
 
 void* commandThread(void* socket) {
@@ -587,7 +670,7 @@ void* createServer(int port) {
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sockfd < 0) {
 		fprintf(stderr, "Error. Socket creation failed.\n");
-		//exit(0);
+		exit(0);
 	} else {
 		printf("Socket successfully created!\n");
 	}
@@ -639,10 +722,12 @@ void* createServer(int port) {
 		childfd = connfd;
 		pthread_create(&head->id, NULL, &commandThread, vport);
 		pthread_join(head->id, NULL);
-		list* t1 = head;
-		list* oldThread = head;
-		t1 = t1->next;
+		//list* t1 = head;
+		//list* oldThread = head;
+		//t1 = t1->next;
 	}
+
+	pthread_exit(0);
 
 
 }
@@ -679,10 +764,10 @@ int main(int argc, char** argv) {
 
 	pthread_create(&head->id, NULL, myThread, vport);
 	pthread_join(head->id, NULL);
-	list* t1 = head;
-	list* oldThread = head;
-	t1 = t1->next;
-	free(oldThread);
+	//list* t1 = head;
+	//list* oldThread = head;
+	//t1 = t1->next;
+	//free(oldThread);
 
 	close(childfd);
 
