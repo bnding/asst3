@@ -867,7 +867,7 @@ void upgrade(char* projectName) {
 				size = ftell(fp);
 
 				if (size == 0) {
-					printf("No upgrades. Everything is up to date!\n");
+					printf("No upates. Everything is up to date!\n");
 					exit(0);
 				}
 			}
@@ -991,14 +991,14 @@ void upgrade(char* projectName) {
 					sprintf(buildLine, "%s\t%s\t%s", currArr[1], decoded[0], sha, strlen(currArr[1]), strlen(decoded[0]), strlen(sha));
 					sprintf(newMan, "%s%s\n", newMan, buildLine, strlen(newMan), strlen(buildLine));
 					flag = 1;
+
+
+					remove(decoded[0]);
+					printf("content: %s\n\n", decoded[1]);
+					FILE* fd = fopen(decoded[0], "w");
+					fprintf(fd, decoded[1]);
+					fclose(fd);
 					break;
-
-
-					//remove(decoded[0]);
-					//printf("content: %s\n\n", decoded[1]);
-					//FILE* fd = fopen(decoded[0], "w");
-					//fprintf(fd, decoded[1]);
-					//fclose(fd);
 				} else if(strcmp(currArr[0], "D") == 0) {
 					if(strcmp(currArr[2], currLineArr[1]) == 0) {
 						flag = 1;	
@@ -1018,11 +1018,93 @@ void upgrade(char* projectName) {
 			sprintf(newMan, "%s%s\n", newMan, buildLine, strlen(newMan), strlen(buildLine));
 			bzero(dCom, BUFF);
 		}
-		printf("NEW MAN\n==========================\n%s", newMan);
 	}
 
+	remove(manPath);
+	printf("NEW MAN\n==========================\n%s", newMan);
+	printf("path: %s\n", manPath);
+	FILE* fd = fopen(manPath, "w");
+	fprintf(fd, newMan);
+	fclose(fd);
 	sendMsg("NickAndVancha'sUniqueKeyThatShouldn'tBeAFileToTerminateAndFinish", sockfd);
+
+	remove(updateBuff);
 }
+
+
+void push(char* projectName) {
+	char updateBuff[BUFF];
+	bzero(updateBuff, BUFF);
+	sprintf(updateBuff, "%s%s", projectName, ".Update", strlen(projectName), strlen(".Update"));
+	if(access(updateBuff, F_OK) != -1) {
+		int size;
+		FILE* fp = fopen(updateBuff, "r");
+		if (NULL != fp) {
+			fseek (fp, 0, SEEK_END);
+			size = ftell(fp);
+
+			if (size == 0) {
+				printf("No updates. Everything is up to date!\n");
+			} else if (size > 0) {
+				printf("Updates are pending. Checking for anything modified...\n");
+				FILE* fp = fopen(updateBuff, "r");
+				int x = 0;
+				char updateStr[BUFF];
+				bzero(updateStr, BUFF);
+
+				while((x = fread(updateStr, 1, sizeof(updateStr), fp)) > 0) {
+					sprintf(updateStr, "%s", updateStr);
+				}
+				fclose(fp);
+
+				if(strstr(updateStr, "M\t") != NULL) {
+					fprintf(stderr, "Files were modified since last push. Upgrade first!\n");
+					exit(0);
+				} else {
+					printf("M does not exist.\n");
+				}
+			}
+		} 
+	}
+	
+	char** config = readConfig();
+	int sockfd = connectServer(config[0], strtol(config[1], NULL, 10));
+
+	sendMsg("push", sockfd);
+	sendMsg(projectName, sockfd);
+	char msg[BUFF];
+	recMsg(msg, sockfd);
+
+	if(strcmp("folder exists", msg) == 0) {
+		printf("Folder exists at server! Continuing...\n\n");
+		char commitPath[BUFF];
+		bzero(commitPath, BUFF);
+
+		
+		sprintf(commitPath, "%s%s", projectName, ".Commit", strlen(projectName), strlen(".Commit"));
+		char* encodedCom = encodeFile(commitPath, ".Commit");
+
+		FILE* fp = fopen(commitPath, "r");
+		int x = 0;
+		char commitContent[BUFF];
+		bzero(commitContent, BUFF);
+
+		while((x = fread(commitContent, 1, sizeof(commitContent), fp)) > 0) {
+			sprintf(commitContent, "%s", commitContent);
+		}
+		fclose(fp);
+
+		printf("commitContent\n===============================\n%s\n", commitContent);
+
+
+
+	} else {
+		fprintf(stderr, "Error. Project does not exist at server.\nTerminating...\n");
+		exit(0);
+	}
+
+}
+
 
 
 int main(int argc, char** argv) {
@@ -1086,9 +1168,24 @@ int main(int argc, char** argv) {
 		rmove(argv[2], argv[3]);
 
 	}  else if (strcmp("update", argv[1]) == 0) {
-		update(argv[2]);
+		if(access(".configure", F_OK) != -1) {
+			update(argv[2]);
+		} else {
+			fprintf(stderr, "Error. Configurations not set! no Valid IP and port.\n");
+		}
 	} else if (strcmp("upgrade", argv[1]) == 0) {
-		upgrade(argv[2]);
+		if(access(".configure", F_OK) != -1) {
+			upgrade(argv[2]);
+		} else {
+			fprintf(stderr, "Error. Configurations not set! no Valid IP and port.\n");
+		}
+
+	} else if(strcmp("push", argv[1]) == 0) {
+		if(access(".configure", F_OK) != -1) {
+			push(argv[2]);
+		} else {
+			fprintf(stderr, "Error. Configurations not set! no Valid IP and port.\n");
+		}
+		return 0;
 	}
-	return 0;
 }

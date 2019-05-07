@@ -33,6 +33,7 @@ int childfd;
 
 void handlerExit() {
 	printf("\nTerminating...\n");
+	pthread_exit(0);
 }
 
 
@@ -67,6 +68,7 @@ void create(char* projectName){
 
 	//makes the file in ServerRepo
 	char filePath[BUFF];
+	bzero(filePath, BUFF);
 
 	sprintf(filePath, ".server_repo/%s", projectName);
 	//printf("attempting to create project in path: %s\n", filePath);
@@ -75,10 +77,11 @@ void create(char* projectName){
 
 		sprintf(filePath, "%s/.Manifest", filePath);
 		FILE *fd = fopen(filePath, "w");
-		fprintf(fd, "1\n");
+		fprintf(fd, "0\n");
 		fclose(fd);
 
 		char historyFile[BUFF];
+		bzero(historyFile, BUFF);
 		sprintf(historyFile, ".server_repo/%s/.history", projectName, strlen(projectName));
 		fd = fopen(historyFile, "w");
 		fprintf(fd, "create\n0\n\n");
@@ -88,7 +91,7 @@ void create(char* projectName){
 		sendMsg(msg, childfd);
 
 	} else {
-		exit(0);
+		//exit(0);
 	}
 	pthread_mutex_unlock(&mLock2);
 }
@@ -102,6 +105,7 @@ int isFile(const char* path) {
 
 void checkout(char* projectName, gzFile outFile, int childfd) {
 	char path[BUFF];
+	bzero(path, BUFF);
 	sprintf(path, ".server_repo/%s", projectName);
 	pthread_mutex_lock(&mLock3);
 	if (folderExist(path)) {
@@ -169,7 +173,7 @@ void checkout(char* projectName, gzFile outFile, int childfd) {
 		closedir(dir);
 	} else {
 		sendMsg("no path", childfd);
-		exit(0);
+		//exit(0);
 	}
 	pthread_mutex_unlock(&mLock3);
 }
@@ -184,7 +188,7 @@ void commit(char* projectName, int childfd) {
 		sendMsg("folder exists", childfd);
 	} else {
 		sendMsg("no path", childfd);
-		exit(0);
+		//exit(0);
 	}
 
 
@@ -211,7 +215,7 @@ void currentVersion(char* projectName, int childfd) {
 		sendMsg(buffer, childfd);
 	} else {
 		sendMsg("no path", childfd);
-		exit(0);
+		//exit(0);
 	}
 	pthread_mutex_unlock(&mLock4);
 }
@@ -219,11 +223,9 @@ void currentVersion(char* projectName, int childfd) {
 
 void destroy(char* projectName) {
 	pthread_mutex_lock(&mLock5);
-	printf("destroy\n");
 	char projectPath[BUFF];
 	bzero(projectPath, BUFF);
 	sprintf(projectPath, ".server_repo/%s", projectName);
-	printf("%s\n", projectPath);
 
 	if(folderExist(projectPath)) {
 		sendMsg("folder exists", childfd);
@@ -233,7 +235,7 @@ void destroy(char* projectName) {
 		system(rmBuff);
 	} else {
 		sendMsg("no path", childfd);
-		exit(0);
+		//exit(0);
 	}
 
 	pthread_mutex_unlock(&mLock5);
@@ -298,8 +300,8 @@ void update(char* projectName, int childfd){
 	sendMsg(snum, childfd);
 	pthread_mutex_unlock(&mLock8);
 
-	return;
-	exit(0);
+	//return;
+	//exit(0);
 
 }
 
@@ -324,7 +326,7 @@ void history(char* projectName) {
 		sendMsg(buffer, childfd);
 	} else {
 		sendMsg("no path", childfd);
-		exit(0);
+		//exit(0);
 	}
 	pthread_mutex_unlock(&mLock6);
 }
@@ -340,7 +342,7 @@ void upgrade(char* projectName) {
 		
 	} else {
 		sendMsg("no path", childfd);
-		exit(0);
+		//exit(0);
 	}
 
 	int count = 0;
@@ -362,6 +364,31 @@ void upgrade(char* projectName) {
 		}
 	}
 	pthread_mutex_unlock(&mLock7);
+}
+
+
+void push(char* projectName) {
+	pthread_mutex_lock(&mLock9);
+	char path[BUFF];
+	sprintf(path, ".server_repo/%s", projectName);
+	printf("path: %s\n", path);
+
+	if(folderExist(path)) {
+		sendMsg("folder exists", childfd);
+		char serverCom[BUFF];
+		bzero(serverCom, BUFF);
+		//sprintf(serverCom, "%s%s");
+
+	} else {
+		sendMsg("no path", childfd);
+		//exit(0);
+	}
+
+
+
+
+
+	pthread_mutex_unlock(&mLock9);
 }
 
 
@@ -418,6 +445,10 @@ void* getCommand() {
 		char projectName[BUFF];
 		recMsg(projectName, childfd);
 		upgrade(projectName);
+	} else if(strcmp("push", command) == 0) {
+		char projectName[BUFF];
+		recMsg(projectName, childfd);
+		push(projectName);
 	}
 
 	pthread_mutex_unlock(&mLock1);
@@ -435,7 +466,7 @@ void* createServer(int port) {
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sockfd < 0) {
 		fprintf(stderr, "Error. Socket creation failed.\n");
-		exit(0);
+		//exit(0);
 	} else {
 		printf("Socket successfully created!\n");
 	}
@@ -444,7 +475,7 @@ void* createServer(int port) {
 
 	if(port < 8000 || port > 64000) {
 		fprintf(stderr, "Error. Server port is not within range!\n");
-		exit(0);
+		//exit(0);
 	}
 
 	serverAddr.sin_family = AF_INET;
@@ -453,28 +484,25 @@ void* createServer(int port) {
 
 	if((bind(sockfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr))) != 0) {
 		fprintf(stderr, "Error. socket bind failed.\n");
-		exit(0);
+		//exit(0);
 	} else {
 		printf("Socket successfully binded!\n");
 	}
 
+
+	
 	if ((listen(sockfd, 5)) != 0) {
 		fprintf(stderr, "Error. Listen failed.\n");
-		exit(0);
+		//exit(0);
 	} else {
 		printf("Server listening...\n");
 	}
 	len = sizeof(client);
 
-	connfd = accept(sockfd, (struct sockaddr*)&client, &len);
-	if(connfd < 0) {
-		fprintf(stderr, "Error. Server accept failed.\n");
-		exit(0);
-	} else {
-		printf("Server accepted to client!\n");
-	}
 
-	childfd = connfd;
+
+
+	
 
 
 
@@ -484,11 +512,24 @@ void* createServer(int port) {
 
 	void* vport = &port;
 
-	pthread_create(&head->id, NULL, &commandThread, vport);
-	pthread_join(head->id, NULL);
-	list* t1 = head;
-	list* oldThread = head;
-	t1 = t1->next;
+	while(1) {
+
+		connfd = accept(sockfd, (struct sockaddr*)&client, &len);
+		if(connfd < 0) {
+			fprintf(stderr, "Error. Server accept failed.\n");
+			//exit(0);
+		} else {
+			printf("Server accepted to client!\n");
+		}
+
+		childfd = connfd;
+		pthread_create(&head->id, NULL, &commandThread, vport);
+		pthread_join(head->id, NULL);
+		list* t1 = head;
+		list* oldThread = head;
+		t1 = t1->next;
+	}
+
 
 }
 
@@ -509,7 +550,7 @@ int main(int argc, char** argv) {
 	int server = socket(AF_INET, SOCK_STREAM, 0);
 	if(server < 0) {
 		fprintf(stderr, "Error creating server!\n");
-		exit(0);
+		//exit(0);
 	} else {
 		printf("Server creation is successful!\n");
 	}
@@ -529,11 +570,12 @@ int main(int argc, char** argv) {
 	t1 = t1->next;
 	free(oldThread);
 
-	getCommand(childfd);
+	//getCommand(childfd);
 
 
 	close(childfd);
-	exit(0);
+	//exit(0);
+
 
 	return 0;
 }

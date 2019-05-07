@@ -27,7 +27,7 @@ void shaString (char* string, char hashBuff[65]) {
 int sha256File(char* filePath, char hashBuff[65]) {
 	int fd = open(filePath, O_RDONLY, 0644);
 	if(fd == -1) {
-		fprintf(stderr, "File does not exist.");
+		fprintf(stderr, "%s\tFile does not exist.", filePath);
 		exit(0);
 	}
 
