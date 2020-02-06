@@ -1,0 +1,280 @@
+﻿First we start with configurations…
+./WTF configure 128.6.13.175 9000
+
+
+This ip address is the IP address of kill.cs.rutgers.edu. The client is at man.cs.rutgers.edu
+
+
+Let’s start with create. The client will request every three seconds should there be no server that is listening in on the same port…
+
+
+./WTF create blah                                                
+[bnd28@man Asst3]$ ./WTF create asdf
+IP: 128.6.13.175
+port: 9000
+Socket creation is successful!
+Attempting to connect...
+Error. Connection to server failed.
+Attempting to connect...
+Error. Connection to server failed.
+Attempting to connect...
+Error. Connection to server failed.
+Attempting to connect...
+Error. Connection to server failed.
+Attempting to connect...
+Error. Connection to server failed.
+Attempting to connect...
+Error. Connection to server failed.
+Attempting to connect...
+Successfully connected to server! ← ./WTFserver 9000 is called at kill.cs.rutgers.edu
+returned socket.
+Project is created.
+
+
+We see that create has made a blah directory in the parent directory and on the server side as well at .server_repo/blah.
+
+
+When we use “ls -a” In these files, we have a .history file for rollbacks as well as .Manifest.
+our history file starting off is…
+create
+0
+.Manifest will be…
+0
+
+
+
+
+
+
+
+
+Testing add, we were able to have the format where the version of the file, filepath, and hash code is made.
+
+
+In blah, we will be adding some files and the Manifest now has…
+ 1
+ 3       blah/test2.txt  6f21f8d755ca49949dfae19d65f2f84892c5daa446c7c13a7114b693e39c8a36
+ 1       blah/modified.txt       941d6b3981e55d1dde3ad549e46b1a80ddd64c7fe4c85314d5b3cb4e90d0429b
+ 1       blah/subDir/NotInServer.txt     c187a9be80b63a5bbc57eb43c88cba536eb4dbd0ec32aeaea9e6d66b566f7be4
+ 1       blah/subDir/subdirfile.txt      b4fb2f1ac7e4f4371cdf897e55d7e84d785c3cd043306eaca46c4bd96477507d
+ 1       blah/notOnServer.txt    96fcd811673d994f16f98970fa334e6f852b5e5bcd88de88474fe6745f8f6247
+
+
+
+
+testing update, we will be having a seperate .Manifest file in the server side…
+
+
+ 2
+ 1       blah/file1.txt  bbe00cc08c884240cd819f54c3b678c9373d3066ab867a46679ead87889b7fd9
+ 1       blah/subDir/NotInClient.txt     08874080c83f3c3d33bd1e401896f36eaeab12297e9963abc70266b389bb6a2c
+ 3       blah/test2.txt  6f21f8d755ca49949dfae19d65f2f84892c5daa446c7c13a7114b693e39c8a36
+ 1       blah/modified.txt       941d6b3981e55d1dde3ad549e46b1a80ddd64c7fe4c85314d5b3cb4e90d0429b
+ 1       blah/subDir/subdirfile.txt      b4fb2f1ac7e4f4371cdf897e55d7e84d785c3cd043306eaca46c4bd96477507d
+ 1       blah/notOnServer.txt    96fcd811673d994f16f98970fa334e6f852b5e5bcd88de88474fe6745f8f6247
+
+
+As you can see, some files were modified (not the same content), and some are not in the server and not in the client. We can now call .Update…
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.Update shows this…
+D       1       blah/subDir/NotInServer.txt     c187a9be80b63a5bbc57eb43c88cba536eb4dbd0ec32aeaea9e6d66b566f7be4
+D       1       blah/notOnServer.txt    96fcd811673d994f16f98970fa334e6f852b5e5bcd88de88474fe6745f8f6247
+A       1       blah/file1.txt  d31263142eae24bcd3f37fdd1ea03dace59d4641c2354b2272903fa745c7aa3a
+A       1       blah/subDir/NotInClient.txt     08874080c83f3c3d33bd1e401896f36eaeab12297e9963abc70266b389bb6a2c
+
+
+
+
+With this, we can now upgrade. Our new manifest will look like this after our upgrade
+2
+1        blah/file1.txt        25ca7a01761ab9578d454a77b4252f26fc6d029d96320674c93a610de22bac6d
+1        blah/subDir/NotInClient.txt        3baba98afe74a4a9fdba6cdd84a21d4e0a1fd4ff43bb6157882b7832ccbbbe9a
+3        blah/test2.txt        6f21f8d755ca49949dfae19d65f2f84892c5daa446c7c13a7114b693e39c8a36
+1        blah/modified.txt        941d6b3981e55d1dde3ad549e46b1a80ddd64c7fe4c85314d5b3cb4e90d0429b
+1        blah/subDir/subdirfile.txt        b4fb2f1ac7e4f4371cdf897e55d7e84d785c3cd043306eaca46c4bd96477507d
+1        blah/notOnServer.txt        96fcd811673d994f16f98970fa334e6f852b5e5bcd88de88474fe6745f8f6247
+
+
+
+
+
+
+For checkout, we were able to zip into a gz file and succesfully bring over the project from the server to the client through recursion.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+An example for rollback can be the following (we decided to test the piazza example. Therefore, our hash encryption will not be the same).
+
+
+create
+0
+
+
+push
+1
+A        1        covfefe/readme.md        mf9asc9sda8jcsa97
+
+
+push
+2
+M        2        covfefe/readme.md        jc8adc98a8e9jc9
+A        1        covfefe/my_code.py        8fjsad98jc9a8808
+
+
+push
+3
+A        1        covfefe/bigly.txt        ausdfh9uahsdc9f4
+A        1        covfefe/data/memes.csv        ca0894ja98jc849aj
+
+
+push
+4
+D        1        covfefe/data/memes.csv        0c8aj498c9a98j9coi
+M        2        covfefe/my_code.py        cu9a984ac09932kc
+M        2        covfefe/images/tweet.png        c0ij4208cawkjdkff
+
+
+Our manifest is…
+4
+covfefe/data/memes.csv        0c8aj498c9a98j9coi
+covfefe/my_code.py        cu9a984ac09932kc
+covfefe/images/tweet.png        c0ij4208cawkjdkff
+
+
+Now we call rollback…
+./WTF rollback covfefe 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.history file will now loo…
+create
+0
+
+
+push
+1
+A        1        covfefe/readme.md        mf9asc9sda8jcsa97
+
+
+push
+2
+M        2        covfefe/readme.md        jc8adc98a8e9jc9
+A        1        covfefe/my_code.py        8fjsad98jc9a8808
+
+
+push
+3
+A        1        covfefe/bigly.txt        ausdfh9uahsdc9f4
+A        1        covfefe/data/memes.csv        ca0894ja98jc849aj
+
+
+push
+4
+D        1        covfefe/data/memes.csv        0c8aj498c9a98j9coi
+M        2        covfefe/my_code.py        cu9a984ac09932kc
+M        2        covfefe/images/tweet.png        c0ij4208cawkjdkff
+
+
+rollback 2
+2
+M        2        covfefe/readme.md        jc8adc98a8e9jc9
+A        1        covfefe/my_code.py        8fjsad98jc9a8808
+
+
+And the manifest will be…
+2
+2        covfefe/readme.md        jc8adc98a8e9jc9
+1        covfefe/my_code.py        8fjsad98jc9a8808
+
+
+
+
+To test commit, we made the server and client manifest to enter every type - upload, add, delete and ignore: 
+Server manifest: 
+1
+4        blah/test2.txt        bccca06d4148997a3a2b94a0e74ed1dc456b354b33f75c74f962c7203bec337d
+1        blah/test1.txt        712592a2810e54c8ea8f3a485bb36ededd41fa18270d4ffa7aefefd0441facf3
+1        sub/file4.txt        a47aa2c29f5eae62ee715dc39072d71fc9eed5e870a356b0f7d2d02e23e17beb
+
+
+
+
+Client manifest: 
+1
+4        blah/test2.txt        7a1ca730c8f9c82616b952cd9c86e3164fbe94104e664ff84151889dd33c48d9
+1        blah/test1.txt        712592a2810e54c8ea8f3a485bb36ededd41fa18270d4ffa7aefefd0441facf3
+1        test1.txt        7271ca6434e22a15c312e40124bf2a63a570693e536d54928510d768ed37be69
+
+
+
+
+This outputted a commit of: 
+
+
+U        4        blah/test2.txt        7a1ca730c8f9c82616b952cd9c86e3164fbe94104e664ff84151889dd33c48d9
+A        1        test1.txt        7271ca6434e22a15c312e40124bf2a63a570693e536d54928510d768ed37be69
+D        1        sub/file4.txt        a47aa2c29f5eae62ee715dc39072d71fc9eed5e870a356b0f7d2d02e23e17beb
+
+
+Next I tested it by having 64 lines of repeated version of these to make sure that it can handle a lot of files. 
+
+
+To test push, we took the same example above and see if it was implemented. Our code for push isn’t complete and working perfectly. Therefore, it creates an output like this for both manifests and removes all the commits: 
+1
+4        blah/test2.txt        7a1ca730c8f9c82616b952cd9c86e3164fbe94104e664ff84151889dd33c48d9
+4        blah/test2.txt        7a1ca730c8f9c82616b952cd9c86e3164fbe94104e664ff84151889dd33c48d9
+2        blah/test1.txt        583d2eb7d7bc250e9c0498df0186b12f65dd81523559f4fefe02237e418231b5
+2        blah/test1.txt        583d2eb7d7bc250e9c0498df0186b12f65dd81523559f4fefe02237e418231b5
+1        test1.txt        7271ca6434e22a15c312e40124bf2a63a570693e536d54928510d768ed37be69
+1        test1.txt        7271ca6434e22a15c312e40124bf2a63a570693e536d54928510d768ed37be69

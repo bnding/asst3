@@ -1,4 +1,5 @@
 #include <openssl/sha.h>
+#include "zlib.h"
 
 void hashString (unsigned char hash[SHA256_DIGEST_LENGTH], char hashBuff[65]) {
 	int i;
@@ -26,7 +27,7 @@ void shaString (char* string, char hashBuff[65]) {
 int sha256File(char* filePath, char hashBuff[65]) {
 	int fd = open(filePath, O_RDONLY, 0644);
 	if(fd == -1) {
-		fprintf(stderr, "File does not exist.");
+		fprintf(stderr, "File does not exist at %s\n", filePath);
 		exit(0);
 	}
 
